@@ -15,16 +15,20 @@ public interface ConfigurationPersistence {
     Path file();
 
     /**
-     * Loads and normalizes the persisted configuration.
+     * Loads the persisted configuration and normalizes it with {@link ApplicationSettings#normalize}.
+     * <p>
+     * Storage and format problems are reported as {@link LoadResult.Failed}, never thrown. Programming
+     * errors, such as a setting validation rule that throws, propagate as unchecked exceptions.
      *
-     * @return {@link LoadResult.Loaded}, {@link LoadResult.NotFound} or {@link LoadResult.Failed}; never throws
-     *         for storage or format problems
+     * @return {@link LoadResult.Loaded}, {@link LoadResult.NotFound} or {@link LoadResult.Failed}
      */
     LoadResult load();
 
     /**
      * Persists the complete snapshot, creating required directories, and atomically
      * replaces any existing configuration. A failed save leaves an existing file intact.
+     *
+     * @throws IllegalArgumentException when {@code settings} use a different schema than this persistence
      */
     void save(ApplicationSettings settings) throws ConfigurationPersistenceException;
 }

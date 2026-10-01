@@ -11,6 +11,7 @@ public final class ConfigurationPersistenceException extends Exception {
 
     /** The persistence operation that failed. */
     public enum Operation {
+        SERIALIZE("serialize configuration"),
         READ("read configuration file"),
         PARSE("parse configuration file"),
         CREATE_DIRECTORY("create configuration directory"),

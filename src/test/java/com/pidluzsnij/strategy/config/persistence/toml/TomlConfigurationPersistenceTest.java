@@ -4,6 +4,7 @@ import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import com.electronwill.nightconfig.toml.TomlParser;
 import com.electronwill.nightconfig.toml.TomlVersion;
+import com.electronwill.nightconfig.core.io.WritingException;
 import com.pidluzsnij.strategy.config.ApplicationSettings;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistence;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistenceException;
@@ -317,5 +318,98 @@ class TomlConfigurationPersistenceTest {
         assertEquals(List.of("graphics.detail.ratio"), loaded.normalization().missing());
         assertEquals(0.5, loaded.settings().get(RATIO));
         assertEquals(6, loaded.settings().get(COUNT));
+    }
+
+    // --- Review follow-ups ----------------------------------------------------------------
+
+    /**
+     * Exact output for a known snapshot, checked by hand against the TOML 1.0 grammar rather
+     * than only by NightConfig's own parser: top-level key/value pairs precede standard tables,
+     * {@code graphics} is defined implicitly by {@code [graphics.detail]}, strings are basic strings
+     * with {@code \"} and {@code \\} escapes and literal UTF-8, integers are decimal, floats have a
+     * fractional part, booleans are lower case, and lines end with LF.
+     */
+    @Test
+    void savedTextMatchesTheExpectedToml10Document() throws Exception {
+        ApplicationSettings settings = ApplicationSettings.defaults(SCHEMA)
+                .with(NAME, "Žluť \"q\" \\ x").with(RATIO, 0.125);
+
+        persistence().save(settings);
+
+        String expected = "volume = 50\n"
+                + "\n"
+                + "[test]\n"
+                + "name = \"Žluť \\\"q\\\" \\\\ x\"\n"
+                + "count = 3\n"
+                + "enabled = true\n"
+                + "\n"
+                + "[graphics.detail]\n"
+                + "ratio = 0.125\n";
+        assertEquals(expected, Files.readString(file(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void serializationFailureIsAPersistenceFailureWithoutNightConfigDetails() throws Exception {
+        writeConfig(TestSettings.COMPLETE_VALID_TOML);
+        byte[] original = Files.readAllBytes(file());
+        RecordingStorage storage = new RecordingStorage();
+        TomlConfigurationPersistence persistence = new TomlConfigurationPersistence(SCHEMA, base(), storage,
+                persisted -> {
+                    throw new WritingException("SECRET-MARKER cannot be written");
+                });
+
+        ConfigurationPersistenceException failure = assertThrows(ConfigurationPersistenceException.class,
+                () -> persistence.save(custom()));
+
+        assertEquals(Operation.SERIALIZE, failure.operation());
+        assertNull(failure.getCause(), "no NightConfig exception is exposed");
+        assertFalse(failure.getMessage().contains("SECRET"), failure.getMessage());
+        assertTrue(storage.events.isEmpty(), "nothing is touched: " + storage.events);
+        assertArrayEquals(original, Files.readAllBytes(file()));
+    }
+
+    @Test
+    void savingSettingsOfAnotherSchemaIsRejected() throws Exception {
+        RecordingStorage storage = new RecordingStorage();
+        ApplicationSettings older = ApplicationSettings.defaults(TestSettings.OLDER_SCHEMA);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new TomlConfigurationPersistence(SCHEMA, base(), storage).save(older));
+
+        assertTrue(storage.events.isEmpty());
+        assertFalse(Files.exists(file()));
+    }
+
+    @Test
+    void staleTemporaryFilesFromAnInterruptedSaveAreRemoved() throws Exception {
+        Path directory = Files.createDirectories(file().getParent());
+        Path stale = Files.writeString(directory.resolve("application-settings.toml.123456.tmp"), "partial");
+        Path otherTemp = Files.writeString(directory.resolve("other.tmp"), "keep");
+        Path log = Files.writeString(directory.resolve("log.log"), "keep");
+
+        persistence().save(custom());
+
+        assertFalse(Files.exists(stale));
+        assertTrue(Files.exists(otherTemp));
+        assertEquals("keep", Files.readString(log));
+        try (Stream<Path> files = Files.list(directory)) {
+            assertEquals(3, files.count(), "only the configuration, other.tmp and log.log remain");
+        }
+        assertEquals(custom(), ((LoadResult.Loaded) persistence().load()).settings());
+    }
+
+    @Test
+    void staleFileCleanupFailureDoesNotPreventSaving() throws Exception {
+        Path directory = Files.createDirectories(file().getParent());
+        Files.writeString(directory.resolve("application-settings.toml.1.tmp"), "partial");
+        RecordingStorage listing = new RecordingStorage();
+        listing.listFailure = new IOException("simulated listing failure");
+        new TomlConfigurationPersistence(SCHEMA, base(), listing).save(custom());
+        assertEquals(custom(), ((LoadResult.Loaded) persistence().load()).settings());
+
+        RecordingStorage deleting = new RecordingStorage();
+        deleting.deleteFailure = new IOException("simulated delete failure");
+        new TomlConfigurationPersistence(SCHEMA, base(), deleting).save(ApplicationSettings.defaults(SCHEMA));
+        assertEquals(ApplicationSettings.defaults(SCHEMA), ((LoadResult.Loaded) persistence().load()).settings());
     }
 }

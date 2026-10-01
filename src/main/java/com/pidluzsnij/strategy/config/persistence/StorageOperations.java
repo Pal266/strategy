@@ -3,10 +3,13 @@ package com.pidluzsnij.strategy.config.persistence;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * File-system operations used by configuration persistence. Separated so that each
@@ -46,6 +49,15 @@ public interface StorageOperations {
     /** Atomically replaces {@code target} with {@code source}; never falls back to a non-atomic copy. */
     default void moveAtomically(Path source, Path target) throws IOException {
         Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /** @return the entries of {@code directory} whose names match the glob {@code pattern} */
+    default List<Path> list(Path directory, String pattern) throws IOException {
+        List<Path> entries = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(directory, pattern)) {
+            stream.forEach(entries::add);
+        }
+        return entries;
     }
 
     default void deleteIfExists(Path file) throws IOException {

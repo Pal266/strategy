@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 /**
  * Persists application settings as a TOML 1.0 file {@code strategy/application-settings.toml}
@@ -41,15 +42,25 @@ public final class TomlConfigurationPersistence implements ConfigurationPersiste
 
     private static final String TEMP_PREFIX = FILE_NAME + ".";
     private static final String TEMP_SUFFIX = ".tmp";
+    /** Temporary files left behind when a previous save was interrupted, for example by a crash. */
+    private static final String STALE_TEMP_PATTERN = TEMP_PREFIX + "*" + TEMP_SUFFIX;
 
     private final SettingsSchema schema;
     private final Path directory;
     private final Path file;
     private final StorageOperations storage;
+    private final Function<PersistedSettings, String> serializer;
 
     public TomlConfigurationPersistence(SettingsSchema schema, Path configDirectory, StorageOperations storage) {
+        this(schema, configDirectory, storage, TomlConfigurationPersistence::serialize);
+    }
+
+    /** Allows tests to exercise serialization failures, which cannot occur with the supported value types. */
+    TomlConfigurationPersistence(SettingsSchema schema, Path configDirectory, StorageOperations storage,
+                                 Function<PersistedSettings, String> serializer) {
         this.schema = Objects.requireNonNull(schema, "schema");
         this.storage = Objects.requireNonNull(storage, "storage");
+        this.serializer = Objects.requireNonNull(serializer, "serializer");
         this.directory = configDirectory.toAbsolutePath().resolve(DIRECTORY_NAME);
         this.file = directory.resolve(FILE_NAME);
     }
@@ -95,13 +106,24 @@ public final class TomlConfigurationPersistence implements ConfigurationPersiste
 
     @Override
     public void save(ApplicationSettings settings) throws ConfigurationPersistenceException {
-        byte[] bytes = serialize(settings.toPersisted()).getBytes(StandardCharsets.UTF_8);
+        if (settings.schema() != schema) {
+            throw new IllegalArgumentException("settings use a different schema than this persistence");
+        }
+        byte[] bytes;
+        try {
+            bytes = serializer.apply(settings.toPersisted()).getBytes(StandardCharsets.UTF_8);
+        } catch (RuntimeException e) {
+            // Writer diagnostics may quote values and are NightConfig-specific: neither is exposed.
+            throw new ConfigurationPersistenceException(Operation.SERIALIZE, file,
+                    "the settings could not be written as TOML", null);
+        }
 
         try {
             storage.createDirectories(directory);
         } catch (IOException | RuntimeException e) {
             throw new ConfigurationPersistenceException(Operation.CREATE_DIRECTORY, file, null, e);
         }
+        deleteStaleTemporaryFiles();
 
         Path temporary;
         try {
@@ -129,11 +151,22 @@ public final class TomlConfigurationPersistence implements ConfigurationPersiste
         }
     }
 
+    /** Best effort: a file that cannot be listed or deleted does not prevent the save. */
+    private void deleteStaleTemporaryFiles() {
+        List<Path> stale;
+        try {
+            stale = storage.list(directory, STALE_TEMP_PATTERN);
+        } catch (IOException | RuntimeException e) {
+            return;
+        }
+        stale.forEach(this::deleteQuietly);
+    }
+
     private void deleteQuietly(Path temporary) {
         try {
             storage.deleteIfExists(temporary);
         } catch (IOException | RuntimeException ignored) {
-            // The save already failed; that failure is reported.
+            // Best effort: the save's own outcome is what gets reported.
         }
     }
 
@@ -175,7 +208,7 @@ public final class TomlConfigurationPersistence implements ConfigurationPersiste
         return value;
     }
 
-    private static String serialize(PersistedSettings persisted) {
+    static String serialize(PersistedSettings persisted) {
         CommentedConfig config = TomlFormat.newConfig(LinkedHashMap::new);
         fill(config, persisted.root());
         TomlWriter writer = TomlFormat.instance().createWriter();

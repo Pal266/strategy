@@ -20,6 +20,8 @@ public class RecordingStorage implements StorageOperations {
     public IOException createTempFailure;
     public IOException writeFailure;
     public IOException moveFailure;
+    public IOException listFailure;
+    public IOException deleteFailure;
 
     public RecordingStorage() {
         this(Collections.synchronizedList(new ArrayList<>()));
@@ -87,8 +89,20 @@ public class RecordingStorage implements StorageOperations {
     }
 
     @Override
+    public List<Path> list(Path directory, String pattern) throws IOException {
+        record("list", directory);
+        if (listFailure != null) {
+            throw listFailure;
+        }
+        return StorageOperations.super.list(directory, pattern);
+    }
+
+    @Override
     public void deleteIfExists(Path file) throws IOException {
         record("delete", file);
+        if (deleteFailure != null) {
+            throw deleteFailure;
+        }
         StorageOperations.super.deleteIfExists(file);
     }
 }
