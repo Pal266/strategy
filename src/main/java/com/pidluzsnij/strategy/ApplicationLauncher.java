@@ -1,5 +1,11 @@
 package com.pidluzsnij.strategy;
 
+import com.pidluzsnij.strategy.config.ApplicationSettings;
+import com.pidluzsnij.strategy.config.SettingsSchema;
+import com.pidluzsnij.strategy.config.persistence.ConfigurationLocation;
+import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistenceFactory;
+import com.pidluzsnij.strategy.config.persistence.DirectoriesConfigurationLocation;
+import com.pidluzsnij.strategy.config.persistence.toml.TomlConfigurationPersistence;
 import com.pidluzsnij.strategy.logging.DirectoriesLogLocation;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LogLocation;
@@ -15,11 +21,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * Starts the application: diagnostic logging first, then all other infrastructure,
- * and closes logging last.
+ * Starts the application: diagnostic logging first, then configuration, then all other
+ * infrastructure, and closes logging last.
  */
 public final class ApplicationLauncher {
 
@@ -30,16 +37,25 @@ public final class ApplicationLauncher {
     private final LogLocation logLocation;
     private final FileOperations fileOperations;
     private final PrintStream stderr;
+    private final SettingsSchema settingsSchema;
+    private final ConfigurationLocation configurationLocation;
+    private final ConfigurationPersistenceFactory persistenceFactory;
     private final Supplier<WindowSystem> windowSystemFactory;
     private final Supplier<RuntimeEnvironment> runtimeFactory;
 
     public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,
-                               PrintStream stderr, Supplier<WindowSystem> windowSystemFactory,
+                               PrintStream stderr, SettingsSchema settingsSchema,
+                               ConfigurationLocation configurationLocation,
+                               ConfigurationPersistenceFactory persistenceFactory,
+                               Supplier<WindowSystem> windowSystemFactory,
                                Supplier<RuntimeEnvironment> runtimeFactory) {
         this.mode = mode;
         this.logLocation = logLocation;
         this.fileOperations = fileOperations;
         this.stderr = stderr;
+        this.settingsSchema = settingsSchema;
+        this.configurationLocation = configurationLocation;
+        this.persistenceFactory = persistenceFactory;
         this.windowSystemFactory = windowSystemFactory;
         this.runtimeFactory = runtimeFactory;
     }
@@ -47,7 +63,14 @@ public final class ApplicationLauncher {
     /** The launcher used by normal application startup. */
     public static ApplicationLauncher forNormalStartup() {
         return new ApplicationLauncher(NORMAL_STARTUP_MODE, new DirectoriesLogLocation(), FileOperations.SYSTEM,
-                System.err, LwjglWindowSystem::new, () -> RuntimeEnvironment.current(Version.getVersion()));
+                System.err, ApplicationSettings.SCHEMA, new DirectoriesConfigurationLocation(),
+                TomlConfigurationPersistence::new, LwjglWindowSystem::new,
+                () -> RuntimeEnvironment.current(Version.getVersion()));
+    }
+
+    /** @return the settings recognized by this launcher's configuration */
+    public SettingsSchema settingsSchema() {
+        return settingsSchema;
     }
 
     /** @return the logging mode this launcher initializes */
@@ -67,9 +90,14 @@ public final class ApplicationLauncher {
         try {
             Logger log = LoggerFactory.getLogger(ApplicationLauncher.class);
             log.info("Application startup begins (logging mode: {})", mode.id());
+            Optional<ApplicationSettings> settings =
+                    new ConfigurationStartup(settingsSchema, configurationLocation, persistenceFactory).initialize();
+            if (settings.isEmpty()) {
+                return Application.EXIT_FAILURE;
+            }
             Application application;
             try {
-                application = new Application(windowSystemFactory.get(), runtimeFactory.get());
+                application = new Application(windowSystemFactory.get(), runtimeFactory.get(), settings.get());
             } catch (RuntimeException | LinkageError e) {
                 log.error("Application infrastructure could not be created", e);
                 return Application.EXIT_FAILURE;

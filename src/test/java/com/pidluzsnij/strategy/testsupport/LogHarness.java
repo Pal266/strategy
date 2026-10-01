@@ -1,6 +1,11 @@
 package com.pidluzsnij.strategy.testsupport;
 
 import com.pidluzsnij.strategy.ApplicationLauncher;
+import com.pidluzsnij.strategy.config.ApplicationSettings;
+import com.pidluzsnij.strategy.config.SettingsSchema;
+import com.pidluzsnij.strategy.config.persistence.ConfigurationLocation;
+import com.pidluzsnij.strategy.config.persistence.StorageOperations;
+import com.pidluzsnij.strategy.config.persistence.toml.TomlConfigurationPersistence;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LogLocation;
 import com.pidluzsnij.strategy.logging.LoggingMode;
@@ -22,7 +27,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-/** Runs the launcher against an isolated per-user configuration directory. */
+/**
+ * Runs the launcher against an isolated per-user configuration directory, used for both
+ * the log file and the configuration file.
+ */
 public final class LogHarness {
 
     public static final RuntimeEnvironment KNOWN_RUNTIME =
@@ -38,12 +46,24 @@ public final class LogHarness {
     public final PrintStream stderr = new PrintStream(stderrBytes, true, StandardCharsets.UTF_8);
     public final AtomicBoolean infrastructureStarted = new AtomicBoolean();
 
+    /** Settings recognized by the launched application. */
+    public SettingsSchema settingsSchema = ApplicationSettings.SCHEMA;
+    /** Storage operations used by configuration persistence. */
+    public StorageOperations storage = StorageOperations.SYSTEM;
+    /** Configuration location; by default the same isolated directory as the log. */
+    public ConfigurationLocation configurationLocation;
+
     public LogHarness(Path tempDirectory) {
         this.configDirectory = tempDirectory.resolve("config");
+        this.configurationLocation = () -> configDirectory;
     }
 
     public Path logFile() {
         return configDirectory.resolve("strategy").resolve("log.log");
+    }
+
+    public Path settingsFile() {
+        return configDirectory.resolve("strategy").resolve("application-settings.toml");
     }
 
     public LogLocation location() {
@@ -64,7 +84,10 @@ public final class LogHarness {
             infrastructureStarted.set(true);
             return KNOWN_RUNTIME;
         };
-        return new ApplicationLauncher(mode, location, fileOperations, stderr, factory, runtime).launch();
+        StorageOperations configurationStorage = storage;
+        return new ApplicationLauncher(mode, location, fileOperations, stderr, settingsSchema, configurationLocation,
+                (schema, directory) -> new TomlConfigurationPersistence(schema, directory, configurationStorage),
+                factory, runtime).launch();
     }
 
     public String stderr() {
