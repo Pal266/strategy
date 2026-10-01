@@ -17,10 +17,6 @@ public enum ResolutionSource {
     }
 
     /** @return the source's name, used in diagnostics */
-    public String description() {
-        return description;
-    }
-
     @Override
     public String toString() {
         return description;

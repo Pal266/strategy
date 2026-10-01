@@ -153,7 +153,7 @@ class VideoSettingsTest {
         InvalidSetting invalid = normalization.invalid().get(0);
         assertEquals("video.resolution", invalid.id());
         assertEquals(InvalidSetting.Reason.INCOMPATIBLE_TYPE, invalid.reason());
-        assertEquals(SettingType.RESOLUTION.name(), invalid.expectedType());
+        assertEquals(RESOLUTION.type().name(), invalid.expectedType());
         assertTrue(normalization.missing().isEmpty());
         assertTrue(normalization.changed());
         assertEquals(table("width", "auto", "height", "auto"),
@@ -168,7 +168,7 @@ class VideoSettingsTest {
 
             assertSame(VideoResolution.AUTOMATIC, normalization.settings().get(RESOLUTION));
             assertEquals(List.of(new InvalidSetting("video.resolution", InvalidSetting.Reason.FAILED_VALIDATION,
-                    SettingType.RESOLUTION.name())), normalization.invalid());
+                    RESOLUTION.type().name())), normalization.invalid());
         }
     }
 

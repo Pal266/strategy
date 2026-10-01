@@ -29,14 +29,6 @@ public final class ResolutionResolver {
                 ResolutionSource.MONITOR_VIDEO_MODE);
     }
 
-    /**
-     * @param videoMode the starting monitor's current video mode, or {@code null} when unavailable
-     * @return the video mode's resolution, or {@link Resolution#FALLBACK} when it cannot be determined
-     */
-    public static Resolution resolve(VideoMode videoMode) {
-        return resolve(VideoResolution.AUTOMATIC, videoMode).resolution();
-    }
-
     static boolean isDetermined(VideoMode videoMode) {
         return videoMode != null && videoMode.width() > 0 && videoMode.height() > 0;
     }

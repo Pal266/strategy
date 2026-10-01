@@ -125,7 +125,7 @@ public final class Application {
 
     private static String describeSelection(VideoResolution resolution) {
         return resolution instanceof VideoResolution.Explicit explicit
-                ? "explicit " + explicit.width() + "×" + explicit.height()
+                ? "explicit " + explicit
                 : "automatic";
     }
 
