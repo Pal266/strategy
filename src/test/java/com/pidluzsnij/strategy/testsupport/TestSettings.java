@@ -1,5 +1,6 @@
 package com.pidluzsnij.strategy.testsupport;
 
+import com.pidluzsnij.strategy.config.LocalizationSettings;
 import com.pidluzsnij.strategy.config.Setting;
 import com.pidluzsnij.strategy.config.SettingType;
 import com.pidluzsnij.strategy.config.SettingsSchema;
@@ -18,11 +19,16 @@ public final class TestSettings {
     public static final Setting<Integer> VOLUME =
             Setting.of("volume", SettingType.INTEGER, 50, v -> v >= 0 && v <= 100);
 
-    /** The current test model. */
-    public static final SettingsSchema SCHEMA = SettingsSchema.of(VOLUME, NAME, COUNT, ENABLED, RATIO);
+    /**
+     * The current test model. It includes the production localization language setting, which application
+     * startup requires to select the localization language.
+     */
+    public static final SettingsSchema SCHEMA =
+            SettingsSchema.of(VOLUME, NAME, COUNT, ENABLED, RATIO, LocalizationSettings.LANGUAGE);
 
     /** An older test model that does not yet know {@link #RATIO}. */
-    public static final SettingsSchema OLDER_SCHEMA = SettingsSchema.of(VOLUME, NAME, COUNT, ENABLED);
+    public static final SettingsSchema OLDER_SCHEMA =
+            SettingsSchema.of(VOLUME, NAME, COUNT, ENABLED, LocalizationSettings.LANGUAGE);
 
     /** Valid TOML containing exactly the recognized settings of {@link #SCHEMA}, all valid. */
     public static final String COMPLETE_VALID_TOML = """
@@ -35,6 +41,9 @@ public final class TestSettings {
 
             [graphics.detail]
             ratio = 0.25
+
+            [localization]
+            language = "en"
             """;
 
     private TestSettings() {

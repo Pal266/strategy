@@ -32,14 +32,16 @@ class ApplicationSettingsTest {
         return new PersistedSettings(table(
                 "volume", 70L,
                 "test", table("name", "custom", "count", 7L, "enabled", false),
-                "graphics", table("detail", table("ratio", 0.25))));
+                "graphics", table("detail", table("ratio", 0.25)),
+                "localization", table("language", "en")));
     }
 
     @Test
-    void productionModelDefinesOnlyTheVideoSettings() {
-        assertEquals(List.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION), ApplicationSettings.SCHEMA.settings());
+    void productionModelDefinesOnlyTheVideoAndLocalizationSettings() {
+        assertEquals(List.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION, LocalizationSettings.LANGUAGE),
+                ApplicationSettings.SCHEMA.settings());
         ApplicationSettings defaults = ApplicationSettings.defaults(ApplicationSettings.SCHEMA);
-        assertEquals(List.of("video"), List.copyOf(defaults.toPersisted().root().keySet()));
+        assertEquals(List.of("video", "localization"), List.copyOf(defaults.toPersisted().root().keySet()));
     }
 
     @Test
@@ -102,7 +104,8 @@ class ApplicationSettingsTest {
 
         SettingsNormalization normalization = ApplicationSettings.normalize(SCHEMA, persisted);
 
-        assertEquals(List.of("volume", "test.count", "test.enabled", "graphics.detail.ratio"), normalization.missing());
+        assertEquals(List.of("volume", "test.count", "test.enabled", "graphics.detail.ratio", "localization.language"),
+                normalization.missing());
         assertTrue(normalization.invalid().isEmpty());
         assertTrue(normalization.unknown().isEmpty());
         assertTrue(normalization.changed());
@@ -185,7 +188,8 @@ class ApplicationSettingsTest {
         SettingsNormalization normalization = ApplicationSettings.normalize(SCHEMA, persisted);
 
         assertEquals(List.of("test"), normalization.unknown());
-        assertEquals(List.of("test.name", "test.count", "test.enabled"), normalization.missing());
+        assertEquals(List.of("test.name", "test.count", "test.enabled", "localization.language"),
+                normalization.missing());
     }
 
     @Test

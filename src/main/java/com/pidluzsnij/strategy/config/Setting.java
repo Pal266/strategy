@@ -23,8 +23,15 @@ public final class Setting<T> {
     private final SettingType<T> type;
     private final T defaultValue;
     private final Predicate<? super T> validation;
+    private final boolean nonTableSectionInvalid;
 
     private Setting(String id, SettingType<T> type, T defaultValue, Predicate<? super T> validation) {
+        this(id, type, defaultValue, validation, false);
+    }
+
+    private Setting(String id, SettingType<T> type, T defaultValue, Predicate<? super T> validation,
+                    boolean nonTableSectionInvalid) {
+        this.nonTableSectionInvalid = nonTableSectionInvalid;
         this.id = Objects.requireNonNull(id, "id");
         this.type = Objects.requireNonNull(type, "type");
         this.validation = Objects.requireNonNull(validation, "validation");
@@ -49,6 +56,19 @@ public final class Setting<T> {
     public static <T> Setting<T> of(String id, SettingType<T> type, T defaultValue,
                                     Predicate<? super T> validation) {
         return new Setting<>(id, type, defaultValue, validation);
+    }
+
+    /**
+     * @return a copy of this setting that is reported as invalid, rather than missing, when one of its
+     * enclosing sections is persisted as something other than a table
+     */
+    public Setting<T> invalidWhenSectionIsNotATable() {
+        return new Setting<>(id, type, defaultValue, validation, true);
+    }
+
+    /** @return whether a non-table enclosing section makes this setting invalid rather than missing */
+    public boolean isInvalidWhenSectionIsNotATable() {
+        return nonTableSectionInvalid;
     }
 
     /** @return the setting's identifier */

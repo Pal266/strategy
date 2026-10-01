@@ -109,7 +109,8 @@ class VideoSettingsStartupTest {
     }
 
     private static String videoToml(String fullscreen, String resolutionTable) {
-        return "[video]\nfullscreen = " + fullscreen + "\n\n[video.resolution]\n" + resolutionTable;
+        return "[video]\nfullscreen = " + fullscreen + "\n\n[video.resolution]\n" + resolutionTable
+                + "\n[localization]\nlanguage = \"en\"\n";
     }
 
     /** Runs configuration initialization alone with the production schema. */
@@ -148,7 +149,7 @@ class VideoSettingsStartupTest {
 
     private void assertPersistedVideo(boolean fullscreen, Object width, Object height) throws IOException {
         CommentedConfig persisted = parse(harness.settingsFile());
-        assertEquals(List.of("video"), List.copyOf(persisted.valueMap().keySet()));
+        assertEquals(java.util.Set.of("video", "localization"), java.util.Set.copyOf(persisted.valueMap().keySet()));
         assertEquals(List.of("fullscreen", "resolution"),
                 List.copyOf(persisted.<CommentedConfig>get("video").valueMap().keySet()));
         assertEquals(fullscreen, persisted.get("video.fullscreen"));
@@ -454,7 +455,7 @@ class VideoSettingsStartupTest {
         ApplicationLauncher normal = ApplicationLauncher.forNormalStartup();
 
         assertEquals(LoggingMode.DEFAULT, normal.mode());
-        assertEquals(List.of("video.fullscreen", "video.resolution"),
+        assertEquals(List.of("video.fullscreen", "video.resolution", "localization.language"),
                 normal.settingsSchema().settings().stream().map(s -> s.id()).toList());
     }
 

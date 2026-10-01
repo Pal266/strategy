@@ -1,0 +1,5 @@
+language_identifier,displayed_name,localization_file
+en,English,english.properties
+uk,Українська,ukrainian.properties
+cs,Čeština,czech.properties
+hu,Magyar,hungarian.properties

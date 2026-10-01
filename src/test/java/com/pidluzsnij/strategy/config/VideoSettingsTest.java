@@ -32,7 +32,8 @@ class VideoSettingsTest {
     }
 
     private static PersistedSettings video(Object fullscreen, Object resolution) {
-        return new PersistedSettings(table("video", table("fullscreen", fullscreen, "resolution", resolution)));
+        return new PersistedSettings(table("video", table("fullscreen", fullscreen, "resolution", resolution),
+                "localization", table("language", "en")));
     }
 
     private static PersistedSettings withResolution(Object width, Object height) {
@@ -57,15 +58,16 @@ class VideoSettingsTest {
 
         assertSame(VideoResolution.AUTOMATIC, defaults.get(RESOLUTION));
         assertEquals("video.resolution", RESOLUTION.id());
-        assertEquals(table("video", table("fullscreen", true, "resolution", table("width", "auto", "height", "auto"))),
-                defaults.toPersisted().root());
+        assertEquals(table("video", table("fullscreen", true, "resolution", table("width", "auto", "height", "auto")),
+                "localization", table("language", "en")), defaults.toPersisted().root());
     }
 
     @Test
     void missingVideoSettingsReceiveTheirDefaults() {
         SettingsNormalization normalization = normalize(new PersistedSettings(table()));
 
-        assertEquals(List.of("video.fullscreen", "video.resolution"), normalization.missing());
+        assertEquals(List.of("video.fullscreen", "video.resolution", "localization.language"),
+                normalization.missing());
         assertTrue(normalization.invalid().isEmpty());
         assertEquals(ApplicationSettings.defaults(SCHEMA), normalization.settings());
     }
@@ -197,8 +199,8 @@ class VideoSettingsTest {
         ApplicationSettings settings = ApplicationSettings.defaults(SCHEMA)
                 .with(FULLSCREEN, false).with(RESOLUTION, VideoResolution.of(1600, 900));
 
-        assertEquals(table("video", table("fullscreen", false, "resolution", table("width", 1600L, "height", 900L))),
-                settings.toPersisted().root());
+        assertEquals(table("video", table("fullscreen", false, "resolution", table("width", 1600L, "height", 900L)),
+                "localization", table("language", "en")), settings.toPersisted().root());
     }
 
     @Test

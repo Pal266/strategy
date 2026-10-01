@@ -16,7 +16,9 @@ public record InvalidSetting(String id, Reason reason, String expectedType) {
         /** The persisted value cannot be converted to the setting's type. */
         INCOMPATIBLE_TYPE,
         /** The persisted value has the required type but violates the setting's validation rule. */
-        FAILED_VALIDATION
+        FAILED_VALIDATION,
+        /** A section enclosing the setting is persisted as something other than a table. */
+        SECTION_NOT_A_TABLE
     }
 
     public InvalidSetting {

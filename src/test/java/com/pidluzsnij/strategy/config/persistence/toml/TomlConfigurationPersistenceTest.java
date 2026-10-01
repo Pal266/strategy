@@ -344,7 +344,10 @@ class TomlConfigurationPersistenceTest {
                 + "enabled = true\n"
                 + "\n"
                 + "[graphics.detail]\n"
-                + "ratio = 0.125\n";
+                + "ratio = 0.125\n"
+                + "\n"
+                + "[localization]\n"
+                + "language = \"en\"\n";
         assertEquals(expected, Files.readString(file(), StandardCharsets.UTF_8));
     }
 

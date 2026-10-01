@@ -5,6 +5,7 @@ import com.electronwill.nightconfig.toml.TomlFormat;
 import com.electronwill.nightconfig.toml.TomlParser;
 import com.electronwill.nightconfig.toml.TomlVersion;
 import com.pidluzsnij.strategy.config.ApplicationSettings;
+import com.pidluzsnij.strategy.config.LocalizationSettings;
 import com.pidluzsnij.strategy.config.SettingsSchema;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationLocation;
 import com.pidluzsnij.strategy.config.persistence.StorageOperations;
@@ -117,8 +118,10 @@ class ConfigurationStartupTest {
         assertEquals(expected.get(COUNT), persisted.<Number>get("test.count").intValue());
         assertEquals(expected.get(ENABLED), persisted.get("test.enabled"));
         assertEquals(expected.get(RATIO), persisted.<Number>get("graphics.detail.ratio").doubleValue());
-        assertEquals(List.of("volume", "test", "graphics"), List.copyOf(persisted.valueMap().keySet()),
-                "no unknown settings are persisted");
+        assertEquals(java.util.Set.of("volume", "test", "graphics", "localization"),
+                java.util.Set.copyOf(persisted.valueMap().keySet()), "no unknown settings are persisted");
+        assertEquals(expected.get(LocalizationSettings.LANGUAGE), persisted.get("localization.language"));
+        assertEquals(1, persisted.<CommentedConfig>get("localization").size());
         assertEquals(3, persisted.<CommentedConfig>get("test").size());
         assertEquals(1, persisted.<CommentedConfig>get("graphics.detail").size());
     }
@@ -282,6 +285,8 @@ class ConfigurationStartupTest {
                 enabled = false
                 [graphics.detail]
                 ratio = 0.25
+                [localization]
+                language = "en"
                 """);
 
         Outcome outcome = initialize(LoggingMode.DEVELOPMENT);
@@ -363,6 +368,8 @@ class ConfigurationStartupTest {
                 [graphics.detail]
                 ratio = 0.75
                 extra = "x"
+                [localization]
+                language = "en"
                 """);
 
         Outcome outcome = initialize(LoggingMode.DEVELOPMENT);
@@ -467,17 +474,18 @@ class ConfigurationStartupTest {
     // --- Scope ----------------------------------------------------------------------------
 
     @Test
-    void productionSchemaFirstRunPersistsTheDefaultVideoSettings() throws Exception {
+    void productionSchemaFirstRunPersistsTheDefaultVideoAndLocalizationSettings() throws Exception {
         harness = new LogHarness(temp);
         assertEquals(ApplicationSettings.SCHEMA, harness.settingsSchema);
         SettingsSchema production = harness.settingsSchema;
-        assertEquals(2, production.settings().size());
+        assertEquals(3, production.settings().size());
 
         FakeWindowSystem windowSystem = new FakeWindowSystem();
         assertEquals(0, harness.launch(LoggingMode.DEFAULT, windowSystem), harness.stderr());
 
         CommentedConfig persisted = parse(harness.settingsFile());
-        assertEquals(List.of("video"), List.copyOf(persisted.valueMap().keySet()));
+        assertEquals(java.util.Set.of("video", "localization"), java.util.Set.copyOf(persisted.valueMap().keySet()));
+        assertEquals("en", persisted.get("localization.language"));
         assertEquals(true, persisted.get("video.fullscreen"));
         assertEquals("auto", persisted.get("video.resolution.width"));
         assertEquals("auto", persisted.get("video.resolution.height"));
@@ -511,7 +519,7 @@ class ConfigurationStartupTest {
         int exit = new ApplicationLauncher(mode, harness.location(), FileOperations.SYSTEM, harness.stderr, SCHEMA,
                 harness.configurationLocation, (schema, dir) -> {
                     throw new NoClassDefFoundError("com/electronwill/nightconfig/core/UnmodifiableConfig");
-                }, () -> {
+                }, harness.localizationResources, () -> {
                     harness.infrastructureStarted.set(true);
                     return new FakeWindowSystem();
                 }, () -> LogHarness.KNOWN_RUNTIME).launch();

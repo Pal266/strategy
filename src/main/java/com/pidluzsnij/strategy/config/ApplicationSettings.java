@@ -18,7 +18,8 @@ import java.util.Set;
 public final class ApplicationSettings {
 
     /** Settings recognized by the application. */
-    public static final SettingsSchema SCHEMA = SettingsSchema.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION);
+    public static final SettingsSchema SCHEMA = SettingsSchema.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION,
+            LocalizationSettings.LANGUAGE);
 
     private final SettingsSchema schema;
     private final Map<Setting<?>, Object> values;
@@ -46,6 +47,12 @@ public final class ApplicationSettings {
         List<String> missing = new ArrayList<>();
         List<InvalidSetting> invalid = new ArrayList<>();
         for (Setting<?> setting : schema.settings()) {
+            if (setting.isInvalidWhenSectionIsNotATable() && persisted.hasNonTableSection(setting.path())) {
+                invalid.add(new InvalidSetting(setting.id(), InvalidSetting.Reason.SECTION_NOT_A_TABLE,
+                        setting.type().name()));
+                values.put(setting, setting.defaultValue());
+                continue;
+            }
             values.put(setting, effectiveValue(setting, persisted.valueAt(setting.path()), missing, invalid));
         }
         List<String> unknown = new ArrayList<>();
@@ -84,6 +91,9 @@ public final class ApplicationSettings {
             }
             if (entry.getValue() instanceof Map<?, ?> && schema.isTablePath(path)) {
                 collectUnknown(schema, path, asTable(entry.getValue()), unknown);
+            } else if (schema.isTablePathOfSettingInvalidWhenNotATable(path)) {
+                // Reported as an invalid setting instead; the section is replaced with its defaults.
+                continue;
             } else {
                 collectLeaves(path, entry.getValue(), unknown);
             }

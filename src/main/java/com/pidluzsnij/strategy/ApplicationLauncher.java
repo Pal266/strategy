@@ -1,11 +1,15 @@
 package com.pidluzsnij.strategy;
 
 import com.pidluzsnij.strategy.config.ApplicationSettings;
+import com.pidluzsnij.strategy.config.LocalizationSettings;
 import com.pidluzsnij.strategy.config.SettingsSchema;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationLocation;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistenceFactory;
 import com.pidluzsnij.strategy.config.persistence.DirectoriesConfigurationLocation;
 import com.pidluzsnij.strategy.config.persistence.toml.TomlConfigurationPersistence;
+import com.pidluzsnij.strategy.localization.Localization;
+import com.pidluzsnij.strategy.localization.LocalizationInitializer;
+import com.pidluzsnij.strategy.localization.LocalizationResources;
 import com.pidluzsnij.strategy.logging.DirectoriesLogLocation;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LogLocation;
@@ -25,8 +29,8 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * Starts the application: diagnostic logging first, then configuration, then all other
- * infrastructure, and closes logging last.
+ * Starts the application: diagnostic logging first, then configuration, then localization, then all
+ * other infrastructure, and closes logging last.
  */
 public final class ApplicationLauncher {
 
@@ -49,6 +53,7 @@ public final class ApplicationLauncher {
     private final SettingsSchema settingsSchema;
     private final ConfigurationLocation configurationLocation;
     private final ConfigurationPersistenceFactory persistenceFactory;
+    private final LocalizationResources localizationResources;
     private final Supplier<WindowSystem> windowSystemFactory;
     private final Supplier<RuntimeEnvironment> runtimeFactory;
 
@@ -56,8 +61,12 @@ public final class ApplicationLauncher {
                                PrintStream stderr, SettingsSchema settingsSchema,
                                ConfigurationLocation configurationLocation,
                                ConfigurationPersistenceFactory persistenceFactory,
+                               LocalizationResources localizationResources,
                                Supplier<WindowSystem> windowSystemFactory,
                                Supplier<RuntimeEnvironment> runtimeFactory) {
+        if (!settingsSchema.contains(LocalizationSettings.LANGUAGE)) {
+            throw new IllegalArgumentException("the settings schema must contain the localization language setting");
+        }
         this.mode = mode;
         this.logLocation = logLocation;
         this.fileOperations = fileOperations;
@@ -65,6 +74,7 @@ public final class ApplicationLauncher {
         this.settingsSchema = settingsSchema;
         this.configurationLocation = configurationLocation;
         this.persistenceFactory = persistenceFactory;
+        this.localizationResources = localizationResources;
         this.windowSystemFactory = windowSystemFactory;
         this.runtimeFactory = runtimeFactory;
     }
@@ -73,7 +83,7 @@ public final class ApplicationLauncher {
     public static ApplicationLauncher forNormalStartup() {
         return new ApplicationLauncher(NORMAL_STARTUP_MODE, new DirectoriesLogLocation(), FileOperations.SYSTEM,
                 System.err, ApplicationSettings.SCHEMA, new DirectoriesConfigurationLocation(),
-                TOML_PERSISTENCE, LwjglWindowSystem::new,
+                TOML_PERSISTENCE, LocalizationResources.bundled(), LwjglWindowSystem::new,
                 () -> RuntimeEnvironment.current(Version.getVersion()));
     }
 
@@ -104,9 +114,16 @@ public final class ApplicationLauncher {
             if (settings.isEmpty()) {
                 return Application.EXIT_FAILURE;
             }
+            Optional<Localization> localization = new LocalizationInitializer(localizationResources)
+                    .initialize(settings.get().get(LocalizationSettings.LANGUAGE));
+            if (localization.isEmpty()) {
+                // Nothing beyond logging has been acquired yet; logging is closed below.
+                return Application.EXIT_FAILURE;
+            }
             Application application;
             try {
-                application = new Application(windowSystemFactory.get(), runtimeFactory.get(), settings.get());
+                application = new Application(windowSystemFactory.get(), runtimeFactory.get(), settings.get(),
+                        localization.get());
             } catch (RuntimeException | LinkageError e) {
                 log.error("Application infrastructure could not be created", e);
                 return Application.EXIT_FAILURE;
