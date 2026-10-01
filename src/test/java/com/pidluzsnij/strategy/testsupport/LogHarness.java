@@ -6,6 +6,7 @@ import com.pidluzsnij.strategy.config.SettingsSchema;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationLocation;
 import com.pidluzsnij.strategy.config.persistence.StorageOperations;
 import com.pidluzsnij.strategy.config.persistence.toml.TomlConfigurationPersistence;
+import com.pidluzsnij.strategy.localization.LocalizationResources;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LogLocation;
 import com.pidluzsnij.strategy.logging.LoggingMode;
@@ -52,6 +53,8 @@ public final class LogHarness {
     public StorageOperations storage = StorageOperations.SYSTEM;
     /** Configuration location; by default the same isolated directory as the log. */
     public ConfigurationLocation configurationLocation;
+    /** Localization resources; by default the application's bundled, read-only resources. */
+    public LocalizationResources localizationResources = LocalizationResources.bundled();
 
     public LogHarness(Path tempDirectory) {
         this.configDirectory = tempDirectory.resolve("config");
@@ -87,7 +90,7 @@ public final class LogHarness {
         StorageOperations configurationStorage = storage;
         return new ApplicationLauncher(mode, location, fileOperations, stderr, settingsSchema, configurationLocation,
                 (schema, directory) -> new TomlConfigurationPersistence(schema, directory, configurationStorage),
-                factory, runtime).launch();
+                localizationResources, factory, runtime).launch();
     }
 
     public String stderr() {

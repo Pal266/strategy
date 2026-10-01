@@ -519,7 +519,7 @@ class ConfigurationStartupTest {
         int exit = new ApplicationLauncher(mode, harness.location(), FileOperations.SYSTEM, harness.stderr, SCHEMA,
                 harness.configurationLocation, (schema, dir) -> {
                     throw new NoClassDefFoundError("com/electronwill/nightconfig/core/UnmodifiableConfig");
-                }, () -> {
+                }, harness.localizationResources, () -> {
                     harness.infrastructureStarted.set(true);
                     return new FakeWindowSystem();
                 }, () -> LogHarness.KNOWN_RUNTIME).launch();

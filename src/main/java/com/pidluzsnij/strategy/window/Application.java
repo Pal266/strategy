@@ -3,8 +3,11 @@ package com.pidluzsnij.strategy.window;
 import com.pidluzsnij.strategy.config.ApplicationSettings;
 import com.pidluzsnij.strategy.config.VideoResolution;
 import com.pidluzsnij.strategy.config.VideoSettings;
+import com.pidluzsnij.strategy.localization.Localization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Objects;
 
 /**
  * Runs the window lifecycle: initialization, black-screen presentation until a close
@@ -25,14 +28,21 @@ public final class Application {
     private final WindowSettings settings;
     private final VideoResolution configuredResolution;
     private final ApplicationSettings applicationSettings;
+    private final Localization localization;
 
     public Application(WindowSystem windowSystem, RuntimeEnvironment runtime,
-                       ApplicationSettings applicationSettings) {
+                       ApplicationSettings applicationSettings, Localization localization) {
         this.windowSystem = windowSystem;
         this.runtime = runtime;
         this.settings = WindowSettings.from(applicationSettings);
         this.configuredResolution = applicationSettings.get(VideoSettings.RESOLUTION);
         this.applicationSettings = applicationSettings;
+        this.localization = Objects.requireNonNull(localization, "localization");
+    }
+
+    /** @return the localization initialized for this application run */
+    public Localization localization() {
+        return localization;
     }
 
     /** @return the complete effective application settings this application was started with */
