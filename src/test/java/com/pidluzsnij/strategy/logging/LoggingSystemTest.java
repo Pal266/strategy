@@ -277,6 +277,45 @@ class LoggingSystemTest {
         assertEquals(1, count(log, "Application startup begins"));
     }
 
+    @Test
+    void writeFailureDuringCleanupIsReportedAndCleanupCompletes() throws Exception {
+        LogHarness harness = new LogHarness(temp);
+        AtomicBoolean failWrites = new AtomicBoolean();
+        FileOperations failing = new FileOperations() {
+            @Override
+            public void write(FileChannel channel, ByteBuffer data) throws IOException {
+                if (failWrites.get()) {
+                    throw new IOException("simulated disk full during cleanup");
+                }
+                FileOperations.super.write(channel, data);
+            }
+        };
+        FakeWindowSystem windowSystem = new FakeWindowSystem();
+        windowSystem.onDestroyWindow = () -> {
+            failWrites.set(true);
+            LoggerFactory.getLogger("test").warn("record during cleanup failure");
+        };
+
+        int exit = harness.launch(LoggingMode.DEFAULT, failing, harness.location(), windowSystem);
+
+        String stderr = harness.stderr();
+        assertTrue(stderr.contains("Failed to write diagnostic log record"), stderr);
+        assertTrue(stderr.contains("simulated disk full during cleanup"), stderr);
+        assertTrue(stderr.contains(harness.logFile().toAbsolutePath().toString()), stderr);
+        assertEquals(List.of("initialize", "startingMonitor", "createWindow", "initializeGraphics",
+                "destroyWindow", "terminate"), windowSystem.events, "cleanup must run to completion");
+        assertEquals(0, exit);
+
+        String log = harness.log();
+        assertTrue(log.contains("Application startup begins"), "earlier records must not be erased");
+        assertTrue(log.contains("Window opened displaying black"), "earlier records must not be erased");
+        assertFalse(log.contains("record during cleanup failure"));
+
+        // Ownership was still released: the file can be owned again.
+        LoggingSystem.initialize(LoggingMode.DEFAULT, harness.location(), FileOperations.SYSTEM, harness.stderr)
+                .close();
+    }
+
     // --- Initialization resources released on Error --------------------------------------
 
     @Test

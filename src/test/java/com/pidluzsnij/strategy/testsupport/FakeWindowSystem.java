@@ -33,6 +33,7 @@ public final class FakeWindowSystem implements WindowSystem {
     public int iterationsBeforeClose;
     public Runnable onInitialize = () -> { };
     public Runnable onProcessEvents = () -> { };
+    public Runnable onDestroyWindow = () -> { };
 
     public WindowSettings createdSettings;
     public Resolution createdResolution;
@@ -119,6 +120,7 @@ public final class FakeWindowSystem implements WindowSystem {
     @Override
     public void destroyWindow() {
         events.add("destroyWindow");
+        onDestroyWindow.run();
         if (destroyFailure != null) {
             throw destroyFailure;
         }
