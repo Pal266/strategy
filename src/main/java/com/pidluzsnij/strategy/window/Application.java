@@ -1,5 +1,6 @@
 package com.pidluzsnij.strategy.window;
 
+import com.pidluzsnij.strategy.config.ApplicationSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,11 +21,19 @@ public final class Application {
     private final WindowSystem windowSystem;
     private final RuntimeEnvironment runtime;
     private final WindowSettings settings;
+    private final ApplicationSettings applicationSettings;
 
-    public Application(WindowSystem windowSystem, RuntimeEnvironment runtime) {
+    public Application(WindowSystem windowSystem, RuntimeEnvironment runtime,
+                       ApplicationSettings applicationSettings) {
         this.windowSystem = windowSystem;
         this.runtime = runtime;
         this.settings = WindowSettings.initial();
+        this.applicationSettings = applicationSettings;
+    }
+
+    /** @return the complete effective application settings this application was started with */
+    public ApplicationSettings applicationSettings() {
+        return applicationSettings;
     }
 
     /** @return {@link #EXIT_SUCCESS} after a normal shutdown, otherwise {@link #EXIT_FAILURE} */

@@ -44,6 +44,11 @@ class ApplicationLoggingTest {
         return records.stream().filter(r -> r.contains(" " + level + " [")).toList();
     }
 
+    /** Records other than the configuration events, which have their own tests. */
+    private static List<String> withoutConfiguration(List<String> records) {
+        return records.stream().filter(r -> !r.contains("] com.pidluzsnij.strategy.ConfigurationStartup - ")).toList();
+    }
+
     private static boolean has(List<String> records, String level, String text) {
         return records.stream().anyMatch(r -> r.contains(" " + level) && r.contains(text));
     }
@@ -169,10 +174,10 @@ class ApplicationLoggingTest {
         windowSystem.graphics = new GraphicsInfo("4.6.0 Probe", "Probe Vendor", "Probe Renderer");
 
         List<String> records = run(mode, windowSystem, 0);
-        List<String> debug = withLevel(records, "DEBUG");
+        List<String> debug = withLevel(withoutConfiguration(records), "DEBUG");
 
         if (mode == LoggingMode.DEFAULT) {
-            assertTrue(debug.isEmpty(), debug.toString());
+            assertTrue(withLevel(records, "DEBUG").isEmpty(), records.toString());
             return;
         }
         assertEquals(5, debug.size(), debug.toString());
@@ -218,7 +223,7 @@ class ApplicationLoggingTest {
         assertTrue(windowSystem.framesRendered > 500);
         assertTrue(withLevel(records, "TRACE").isEmpty());
         // Startup, runtime, monitor, OpenGL, window opened, close request, release, normal shutdown.
-        assertEquals(8, records.size(), records.toString());
+        assertEquals(8, withoutConfiguration(records).size(), records.toString());
     }
 
     // --- Shutdown ordering and resource release -------------------------------------------

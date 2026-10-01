@@ -1,6 +1,7 @@
 package com.pidluzsnij.strategy.testsupport;
 
 import com.pidluzsnij.strategy.ApplicationLauncher;
+import com.pidluzsnij.strategy.config.ApplicationSettings;
 import com.pidluzsnij.strategy.logging.DirectoriesLogLocation;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LoggingMode;
@@ -22,7 +23,8 @@ import java.util.function.Supplier;
  * <p>
  * Usage: {@code ProbeMain location} prints the production per-user configuration directory;
  * {@code ProbeMain run|hold <configDir> <marker>} launches the application with a fake window
- * system. {@code hold} prints {@code READY} once running and closes after a line on stdin.
+ * system, using {@code configDir} for both the log and the configuration file. {@code hold}
+ * prints {@code READY} once running and closes after a line on stdin.
  */
 public final class ProbeMain {
 
@@ -64,7 +66,8 @@ public final class ProbeMain {
             return windowSystem;
         };
         int exitCode = new ApplicationLauncher(LoggingMode.DEFAULT, () -> configDirectory, FileOperations.SYSTEM,
-                System.err, factory, () -> RuntimeEnvironment.current("probe")).launch();
+                System.err, ApplicationSettings.SCHEMA, () -> configDirectory, ApplicationLauncher.TOML_PERSISTENCE,
+                factory, () -> RuntimeEnvironment.current("probe")).launch();
         System.out.println("EXIT " + exitCode);
         System.out.flush();
         System.exit(exitCode);
