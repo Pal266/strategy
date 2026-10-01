@@ -45,15 +45,16 @@ final class ConfigurationStartup {
             if (configDirectory == null) {
                 throw new IllegalStateException("no configuration directory was reported");
             }
-        } catch (Exception e) {
+        } catch (Exception | LinkageError e) {
             return fail("resolve configuration location", null, e);
         }
 
         ConfigurationPersistence persistence;
         try {
             persistence = persistenceFactory.create(schema, configDirectory);
-        } catch (RuntimeException e) {
-            return fail("resolve configuration location", null, e);
+        } catch (RuntimeException | LinkageError e) {
+            // Also covers a configuration library missing at runtime, which surfaces on first use.
+            return fail("create configuration persistence", null, e);
         }
         Path file = persistence.file();
         log.debug("Configuration location resolved: {}", file);
@@ -74,7 +75,7 @@ final class ConfigurationStartup {
             return Optional.of(settings);
         } catch (ConfigurationPersistenceException e) {
             return fail(e);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | LinkageError e) {
             return fail("initialize configuration", file, e);
         }
     }
@@ -94,14 +95,14 @@ final class ConfigurationStartup {
         SettingsNormalization normalization = loaded.normalization();
         log.debug("Existing configuration loaded from {}", file);
         for (String id : normalization.missing()) {
-            log.debug("Configuration setting '{}' is missing; using its default", id);
+            log.debug("Configuration setting '{}' is missing; using its default", printable(id));
         }
         for (InvalidSetting invalid : normalization.invalid()) {
             log.warn("Configuration setting '{}' has an invalid value ({}); using its default",
-                    invalid.id(), describe(invalid));
+                    printable(invalid.id()), describe(invalid));
         }
         for (String id : normalization.unknown()) {
-            log.debug("Unknown configuration setting '{}' discarded", id);
+            log.debug("Unknown configuration setting '{}' discarded", printable(id));
         }
 
         if (!normalization.changed()) {
@@ -114,6 +115,25 @@ final class ConfigurationStartup {
         persistence.save(normalization.settings());
         log.debug("Configuration snapshot saved to {} (reason: normalization)", file);
         return normalization.settings();
+    }
+
+    /**
+     * Escapes backslashes and control or line-separator characters in a setting identifier, so that an
+     * identifier read from the file (for example a quoted TOML key) cannot forge log records.
+     */
+    static String printable(String id) {
+        StringBuilder result = new StringBuilder(id.length());
+        for (int i = 0; i < id.length(); i++) {
+            char c = id.charAt(i);
+            if (c == '\\') {
+                result.append("\\\\");
+            } else if (Character.isISOControl(c) || c == '\u2028' || c == '\u2029') {
+                result.append(String.format("\\u%04X", (int) c));
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
 
     private static String describe(InvalidSetting invalid) {

@@ -46,10 +46,16 @@ public final class ProbeProcess {
 
     public static ProbeProcess start(Path workingDirectory, Map<String, String> environment, String... args)
             throws IOException {
+        return startWithClasspath(workingDirectory, environment, System.getProperty("java.class.path"), args);
+    }
+
+    /** Starts the probe with an explicit class path, for example one lacking a library. */
+    public static ProbeProcess startWithClasspath(Path workingDirectory, Map<String, String> environment,
+                                                  String classpath, String... args) throws IOException {
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("-cp");
-        command.add(System.getProperty("java.class.path"));
+        command.add(classpath);
         command.add(ProbeMain.class.getName());
         command.addAll(List.of(args));
         ProcessBuilder builder = new ProcessBuilder(command).directory(workingDirectory.toFile());

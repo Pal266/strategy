@@ -6,6 +6,7 @@ import com.pidluzsnij.strategy.testsupport.ProbeProcess;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.Files;
@@ -14,6 +15,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -102,5 +104,29 @@ class ConfigurationProcessTest {
             lock.release();
         }
         assertEmpty(sentinel);
+    }
+
+    @Test
+    void missingConfigurationLibraryIsLoggedAsAConfigurationFailure() throws Exception {
+        String classpath = Stream.of(System.getProperty("java.class.path").split(File.pathSeparator))
+                .filter(entry -> !entry.contains("night-config"))
+                .collect(Collectors.joining(File.pathSeparator));
+        assertFalse(classpath.contains("night-config"));
+        Path cwd = Files.createDirectories(temp.resolve("cwd"));
+
+        ProbeProcess probe = ProbeProcess.startWithClasspath(cwd, Map.of(), classpath, "run",
+                configDirectory().toString(), "no-library");
+
+        assertEquals(1, probe.awaitExit(TIMEOUT_SECONDS), probe.stderr());
+        assertTrue(probe.stdout().contains("EXIT 1"), "the launcher returned normally: " + probe.stdout());
+        assertTrue(probe.stdout().stream().noneMatch(l -> l.startsWith("INFRA_STARTED")));
+        assertFalse(probe.stderr().contains("NoClassDefFoundError"), "nothing escapes before logging: "
+                + probe.stderr());
+        String log = LogHarness.readUtf8(logFile());
+        assertEquals(1, LogHarness.count(log, "Configuration initialization failed"), log);
+        assertTrue(log.contains("create configuration persistence"), log);
+        assertTrue(log.contains("java.lang.NoClassDefFoundError"), log);
+        assertFalse(log.contains("Normal shutdown completed"));
+        assertFalse(Files.exists(settingsFile()));
     }
 }

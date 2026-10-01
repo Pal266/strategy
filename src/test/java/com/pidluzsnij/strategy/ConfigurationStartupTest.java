@@ -492,4 +492,53 @@ class ConfigurationStartupTest {
 
         assertEquals(1, calls[0]);
     }
+
+    // --- Review follow-ups ----------------------------------------------------------------
+
+    @ParameterizedTest
+    @EnumSource(LoggingMode.class)
+    void missingConfigurationLibraryIsAFatalConfigurationFailure(LoggingMode mode) {
+        prepare();
+        int exit = new ApplicationLauncher(mode, harness.location(), FileOperations.SYSTEM, harness.stderr, SCHEMA,
+                harness.configurationLocation, (schema, dir) -> {
+                    throw new NoClassDefFoundError("com/electronwill/nightconfig/core/UnmodifiableConfig");
+                }, () -> {
+                    harness.infrastructureStarted.set(true);
+                    return new FakeWindowSystem();
+                }, () -> LogHarness.KNOWN_RUNTIME).launch();
+
+        assertEquals(1, exit);
+        Outcome outcome = new Outcome(Optional.empty(), harness.records(), harness.log());
+        assertFalse(harness.infrastructureStarted.get());
+        assertSingleFailure(outcome, "create configuration persistence", "configuration file: unavailable");
+        assertTrue(outcome.log().contains("java.lang.NoClassDefFoundError"));
+        assertFalse(outcome.log().contains("resolve configuration location"));
+    }
+
+    @Test
+    void unknownIdentifiersCannotForgeLogRecords() throws Exception {
+        prepare();
+        writeConfig(TestSettings.COMPLETE_VALID_TOML
+                + "\n[\"we\\nird\"]\nk = 1\n\"tab\\there\" = 2\n\"back\\\\slash\\u2028\" = 3\n");
+
+        Outcome outcome = initialize(LoggingMode.DEVELOPMENT);
+
+        assertTrue(outcome.settings().isPresent());
+        assertTrue(outcome.has("DEBUG", "Unknown configuration setting 'we\\u000Aird.k' discarded"),
+                outcome.log());
+        assertTrue(outcome.has("DEBUG", "Unknown configuration setting 'we\\u000Aird.tab\\u0009here' discarded"));
+        assertTrue(outcome.has("DEBUG", "Unknown configuration setting 'we\\u000Aird.back\\\\slash\\u2028' discarded"));
+        for (String line : outcome.log().split("\n", -1)) {
+            assertTrue(line.isEmpty() || LogHarness.RECORD_START.matcher(line).matches(),
+                    "every line is a genuine record: " + line);
+        }
+    }
+
+    @Test
+    void printableEscapesOnlyAmbiguousCharacters() {
+        assertEquals("graphics.detail.ratio", ConfigurationStartup.printable("graphics.detail.ratio"));
+        assertEquals("Žluť klíč", ConfigurationStartup.printable("Žluť klíč"));
+        assertEquals("a\\u000Db\\u001Bc\\u0085d\\u2029e\\\\f",
+                ConfigurationStartup.printable("a\rb\u001Bc\u0085d\u2029e\\f"));
+    }
 }

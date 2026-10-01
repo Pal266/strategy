@@ -2,7 +2,6 @@ package com.pidluzsnij.strategy.testsupport;
 
 import com.pidluzsnij.strategy.ApplicationLauncher;
 import com.pidluzsnij.strategy.config.ApplicationSettings;
-import com.pidluzsnij.strategy.config.persistence.toml.TomlConfigurationPersistence;
 import com.pidluzsnij.strategy.logging.DirectoriesLogLocation;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LoggingMode;
@@ -67,7 +66,7 @@ public final class ProbeMain {
             return windowSystem;
         };
         int exitCode = new ApplicationLauncher(LoggingMode.DEFAULT, () -> configDirectory, FileOperations.SYSTEM,
-                System.err, ApplicationSettings.SCHEMA, () -> configDirectory, TomlConfigurationPersistence::new,
+                System.err, ApplicationSettings.SCHEMA, () -> configDirectory, ApplicationLauncher.TOML_PERSISTENCE,
                 factory, () -> RuntimeEnvironment.current("probe")).launch();
         System.out.println("EXIT " + exitCode);
         System.out.flush();

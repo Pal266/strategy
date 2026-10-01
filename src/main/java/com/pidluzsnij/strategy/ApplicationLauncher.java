@@ -30,6 +30,15 @@ import java.util.function.Supplier;
  */
 public final class ApplicationLauncher {
 
+    /**
+     * TOML configuration persistence used by normal startup. A lambda rather than a constructor
+     * reference: the persistence class (and the TOML library) is then only loaded when configuration
+     * initialization creates it, so a library missing at runtime is reported as a configuration
+     * failure in the log instead of escaping before logging starts.
+     */
+    public static final ConfigurationPersistenceFactory TOML_PERSISTENCE =
+            (schema, configDirectory) -> new TomlConfigurationPersistence(schema, configDirectory);
+
     /** Logging mode selected for normal application startup. */
     public static final LoggingMode NORMAL_STARTUP_MODE = LoggingMode.DEFAULT;
 
@@ -64,7 +73,7 @@ public final class ApplicationLauncher {
     public static ApplicationLauncher forNormalStartup() {
         return new ApplicationLauncher(NORMAL_STARTUP_MODE, new DirectoriesLogLocation(), FileOperations.SYSTEM,
                 System.err, ApplicationSettings.SCHEMA, new DirectoriesConfigurationLocation(),
-                TomlConfigurationPersistence::new, LwjglWindowSystem::new,
+                TOML_PERSISTENCE, LwjglWindowSystem::new,
                 () -> RuntimeEnvironment.current(Version.getVersion()));
     }
 
