@@ -4,7 +4,9 @@ import org.lwjgl.glfw.Callbacks;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.Platform;
 
 import java.nio.IntBuffer;
 
@@ -45,6 +47,12 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 /** {@link WindowSystem} backed by LWJGL's GLFW and OpenGL bindings. */
 public final class LwjglWindowSystem implements WindowSystem {
 
+    /**
+     * GLFW variant for macOS that dispatches to the main thread itself, so the JVM does not
+     * need {@code -XstartOnFirstThread} (an option other platforms' JVMs reject).
+     */
+    static final String MACOS_GLFW_LIBRARY_NAME = "glfw_async";
+
     private GLFWErrorCallback errorCallback;
     private boolean initialized;
     private long monitor = NULL;
@@ -53,6 +61,7 @@ public final class LwjglWindowSystem implements WindowSystem {
 
     @Override
     public void initialize(GlfwErrorListener errorListener) {
+        selectGlfwLibrary(Platform.get());
         errorCallback = GLFWErrorCallback.create((code, description) ->
                 errorListener.onError(code, GLFWErrorCallback.getDescription(description)));
         glfwSetErrorCallback(errorCallback);
@@ -60,6 +69,22 @@ public final class LwjglWindowSystem implements WindowSystem {
             throw new IllegalStateException("glfwInit returned false");
         }
         initialized = true;
+    }
+
+    /**
+     * Chooses the GLFW native library before GLFW is first loaded. An explicitly configured
+     * library name is left unchanged.
+     */
+    static void selectGlfwLibrary(Platform platform) {
+        String library = glfwLibraryNameFor(platform);
+        if (library != null && Configuration.GLFW_LIBRARY_NAME.get() == null) {
+            Configuration.GLFW_LIBRARY_NAME.set(library);
+        }
+    }
+
+    /** @return the GLFW library name to use on the platform, or {@code null} for LWJGL's default */
+    static String glfwLibraryNameFor(Platform platform) {
+        return platform == Platform.MACOSX ? MACOS_GLFW_LIBRARY_NAME : null;
     }
 
     @Override

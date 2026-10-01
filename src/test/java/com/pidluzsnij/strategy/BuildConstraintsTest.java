@@ -76,6 +76,10 @@ class BuildConstraintsTest {
         assertNative(platform, archDirectory, "", prefix + "lwjgl" + suffix, "lwjgl-3.4.3-" + classifier + ".jar");
         assertNative(platform, archDirectory, "glfw/", prefix + "glfw" + suffix,
                 "lwjgl-glfw-3.4.3-" + classifier + ".jar");
+        if (platform.equals("macos")) {
+            assertNative(platform, archDirectory, "glfw/", "libglfw_async.dylib",
+                    "lwjgl-glfw-3.4.3-" + classifier + ".jar");
+        }
         assertNative(platform, archDirectory, "opengl/", prefix + "lwjgl_opengl" + suffix,
                 "lwjgl-opengl-3.4.3-" + classifier + ".jar");
     }
