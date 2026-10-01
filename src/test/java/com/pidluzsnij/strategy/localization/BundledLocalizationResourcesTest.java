@@ -4,7 +4,16 @@ import com.pidluzsnij.strategy.ApplicationLauncher;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -55,6 +64,34 @@ class BundledLocalizationResourcesTest {
         }
         for (String file : FILES) {
             assertNotNull(ApplicationLauncher.class.getClassLoader().getResource("localization/" + file), file);
+        }
+    }
+
+    /**
+     * Class-path lookup of a directory on a case-insensitive file system ignores case, but lookup in an
+     * archive does not; every referenced file name must therefore match a bundled file name exactly.
+     */
+    @Test
+    void metadataFileNamesMatchBundledFileNamesExactlyIncludingCase() throws Exception {
+        LanguageMetadata metadata = MetadataParser.parse(
+                Utf8.decode(LocalizationResources.bundled().read(LocalizationResources.METADATA_FILE)));
+        URI folder = ApplicationLauncher.class.getClassLoader().getResource("localization/languages.csv").toURI();
+        Set<String> bundled = new HashSet<>();
+        if (folder.getScheme().equals("jar")) {
+            try (FileSystem jar = FileSystems.newFileSystem(folder, Map.of());
+                 Stream<Path> files = Files.list(jar.getPath("/localization"))) {
+                files.forEach(file -> bundled.add(file.getFileName().toString()));
+            }
+        } else {
+            try (Stream<Path> files = Files.list(Path.of(folder).getParent())) {
+                files.forEach(file -> bundled.add(file.getFileName().toString()));
+            }
+        }
+
+        assertTrue(bundled.contains(LocalizationResources.METADATA_FILE), bundled.toString());
+        for (LanguageMetadata.Entry entry : metadata.entries()) {
+            assertTrue(bundled.contains(entry.localizationFile()),
+                    entry.localizationFile() + " must match a bundled file exactly: " + bundled);
         }
     }
 

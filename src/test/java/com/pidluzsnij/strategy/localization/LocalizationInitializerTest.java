@@ -216,6 +216,81 @@ class LocalizationInitializerTest {
         assertEquals(List.of("languages.csv"), resources.reads);
     }
 
+    // --- Byte-order marks ------------------------------------------------------------------
+
+    private static final String BOM = "\uFEFF";
+
+    @Test
+    void leadingByteOrderMarkIsNotPartOfTheFirstHeaderFieldOrKey() throws Exception {
+        FixtureResources resources = new FixtureResources()
+                .put(LocalizationResources.METADATA_FILE, BOM + FixtureResources.METADATA.replace("\n", "\r\n"))
+                .put("ukrainian.properties", BOM + "greeting=Привіт\r\nsecond=" + BOM + "kept\r\n");
+
+        Outcome outcome = run(resources, "uk");
+
+        assertSucceeded(outcome, "uk", false);
+        assertEquals("Привіт", outcome.get().text("greeting"));
+        assertEquals(BOM + "greeting", outcome.get().text(BOM + "greeting"), "the mark creates no key");
+        assertEquals(BOM + "kept", outcome.get().text("second"), "only a leading mark is an encoding signature");
+        assertEquals("en", outcome.get().languages().get(0).identifier());
+    }
+
+    @Test
+    void fileContainingOnlyAByteOrderMarkIsEmpty() throws Exception {
+        FixtureResources resources = new FixtureResources().put("czech.properties", BOM);
+
+        Outcome outcome = run(resources, "cs");
+
+        assertSucceeded(outcome, "cs", false);
+        assertEquals(1, outcome.containing("DEBUG", FILE_LOADED + " for language 'cs' from "
+                + "localization/czech.properties: 0 keys").size(), outcome.log());
+    }
+
+    // --- Unexpected failures ----------------------------------------------------------------
+
+    /** Resources whose read of {@code failing} throws a JVM linkage error. */
+    private static LocalizationResources linkageFailure(FixtureResources delegate, String failing) {
+        return fileName -> {
+            if (fileName.equals(failing)) {
+                throw new NoClassDefFoundError("SECRET-LINKAGE-MARKER");
+            }
+            return delegate.read(fileName);
+        };
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"metadata", "configured-english", "selected-non-english", "english-fallback"})
+    void unexpectedJvmErrorsInAnyStageAreRecordedOnceAndFatal(String stage) throws Exception {
+        FixtureResources fixture = new FixtureResources();
+        String configured = stage.equals("configured-english") ? "en" : "uk";
+        String failing = switch (stage) {
+            case "metadata" -> LocalizationResources.METADATA_FILE;
+            case "selected-non-english" -> "ukrainian.properties";
+            default -> "english.properties";
+        };
+        if (stage.equals("english-fallback")) {
+            fixture.remove("ukrainian.properties");
+        }
+
+        Outcome outcome = LocalizationRun.run(temp.resolve("linkage-" + stage), LoggingMode.DEVELOPMENT,
+                linkageFailure(fixture, failing), configured);
+
+        String expectedStage = switch (stage) {
+            case "metadata" -> "load language metadata";
+            case "english-fallback" -> "load English fallback localization file";
+            default -> "load localization file";
+        };
+        String error = assertFailed(outcome, expectedStage);
+        assertTrue(error.contains("resource: localization/" + failing), error);
+        assertTrue(error.contains("unexpected failure"), error);
+        assertTrue(error.contains("java.lang.NoClassDefFoundError (message omitted)"), error);
+        assertTrue(error.contains("\tat "), "stack trace is retained: " + error);
+        assertEquals(stage.equals("english-fallback") ? 1 : 0, outcome.containing("WARN ", FALLBACK).size(),
+                "a JVM error is not a file-availability fallback: " + outcome.log());
+        assertFalse(outcome.log().contains("SECRET"), outcome.log());
+        assertFalse(outcome.stderr().contains("SECRET"), outcome.stderr());
+    }
+
     // --- Selection --------------------------------------------------------------------------
 
     @Test

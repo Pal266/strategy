@@ -13,13 +13,22 @@ final class Utf8 {
     private Utf8() {
     }
 
-    /** @throws CharacterCodingException when {@code bytes} are not valid UTF-8 */
+    /** Byte-order mark that some editors write at the start of UTF-8 files. */
+    private static final char BYTE_ORDER_MARK = '\uFEFF';
+
+    /**
+     * Decodes strictly as UTF-8. A single byte-order mark at the very start is an encoding signature,
+     * not content, and is removed so that it cannot become part of the first key or header field.
+     *
+     * @throws CharacterCodingException when {@code bytes} are not valid UTF-8
+     */
     static String decode(byte[] bytes) throws CharacterCodingException {
-        return StandardCharsets.UTF_8.newDecoder()
+        String text = StandardCharsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
                 .decode(ByteBuffer.wrap(bytes))
                 .toString();
+        return !text.isEmpty() && text.charAt(0) == BYTE_ORDER_MARK ? text.substring(1) : text;
     }
 
     /**

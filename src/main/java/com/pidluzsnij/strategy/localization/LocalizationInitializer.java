@@ -39,16 +39,32 @@ public final class LocalizationInitializer {
      */
     public Optional<Localization> initialize(String configuredLanguage) {
         Objects.requireNonNull(configuredLanguage, "configuredLanguage");
-        String metadataResource = resources.resourceName(LocalizationResources.METADATA_FILE);
-        LanguageMetadata metadata;
+        Progress progress = new Progress();
         try {
-            metadata = loadMetadata();
+            return select(configuredLanguage, progress);
         } catch (LocalizationFailure failure) {
-            return fail(STAGE_METADATA, metadataResource, failure);
+            return fail(progress, failure);
         } catch (RuntimeException | LinkageError e) {
-            return fail(STAGE_METADATA, metadataResource,
-                    new LocalizationFailure("unexpected failure", SanitizedException.of(e)));
+            // Any unexpected failure in any stage is still recorded once, here, before startup ends.
+            return fail(progress, new LocalizationFailure("unexpected failure", SanitizedException.of(e)));
         }
+    }
+
+    /** The stage in progress and its resource, for the failure diagnostic. */
+    private static final class Progress {
+        private String stage;
+        private String resource;
+
+        void enter(String stage, String resource) {
+            this.stage = stage;
+            this.resource = resource;
+        }
+    }
+
+    private Optional<Localization> select(String configuredLanguage, Progress progress) throws LocalizationFailure {
+        String metadataResource = resources.resourceName(LocalizationResources.METADATA_FILE);
+        progress.enter(STAGE_METADATA, metadataResource);
+        LanguageMetadata metadata = loadMetadata();
         log.debug("Language metadata loaded from {}: {} language entries", metadataResource,
                 metadata.entries().size());
 
@@ -57,17 +73,14 @@ public final class LocalizationInitializer {
         String englishResource = resources.resourceName(english.localizationFile());
 
         if (configured.isPresent() && configured.get().language().identifier().equals(ENGLISH)) {
-            try {
-                TranslationFile file = loadFile(english);
-                return succeed(metadata, configuredLanguage, ENGLISH, false, file);
-            } catch (LocalizationFailure failure) {
-                return fail(STAGE_FILE, englishResource, failure);
-            }
+            progress.enter(STAGE_FILE, englishResource);
+            return succeed(metadata, configuredLanguage, ENGLISH, false, loadFile(english));
         }
 
         String unavailableReason;
         if (configured.isPresent()) {
             LanguageMetadata.Entry entry = configured.get();
+            progress.enter(STAGE_FILE, resources.resourceName(entry.localizationFile()));
             try {
                 TranslationFile file = loadFile(entry);
                 return succeed(metadata, configuredLanguage, entry.language().identifier(), false, file);
@@ -82,12 +95,8 @@ public final class LocalizationInitializer {
 
         log.warn("Configured language is unavailable ({}); falling back to language '{}' (resource: {})",
                 unavailableReason, ENGLISH, englishResource);
-        try {
-            TranslationFile file = loadFile(english);
-            return succeed(metadata, configuredLanguage, ENGLISH, true, file);
-        } catch (LocalizationFailure failure) {
-            return fail(STAGE_FALLBACK, englishResource, failure);
-        }
+        progress.enter(STAGE_FALLBACK, englishResource);
+        return succeed(metadata, configuredLanguage, ENGLISH, true, loadFile(english));
     }
 
     private LanguageMetadata loadMetadata() throws LocalizationFailure {
@@ -108,9 +117,6 @@ public final class LocalizationInitializer {
         } catch (MalformedResourceException e) {
             throw new LocalizationFailure(resources.resourceName(fileName)
                     + " is malformed (" + e.getMessage() + ")", null);
-        } catch (RuntimeException e) {
-            throw new LocalizationFailure(resources.resourceName(fileName) + " could not be loaded",
-                    SanitizedException.of(e));
         }
         log.debug("Localization file loaded for language '{}' from {}: {} keys", entry.language().identifier(),
                 resources.resourceName(fileName), file.keyCount());
@@ -147,9 +153,9 @@ public final class LocalizationInitializer {
         return Optional.of(localization);
     }
 
-    private Optional<Localization> fail(String stage, String resource, LocalizationFailure failure) {
+    private Optional<Localization> fail(Progress progress, LocalizationFailure failure) {
         log.error("Localization initialization failed: could not {} (resource: {}): {}",
-                stage, resource, failure.reason(), failure);
+                progress.stage, progress.resource, failure.reason(), failure);
         return Optional.empty();
     }
 }

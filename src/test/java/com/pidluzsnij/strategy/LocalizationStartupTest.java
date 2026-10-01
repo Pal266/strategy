@@ -449,6 +449,30 @@ class LocalizationStartupTest {
     }
 
     @Test
+    void unexpectedJvmErrorDuringLocalizationIsLoggedBeforeLoggingCloses() throws Exception {
+        prepare();
+        harness.localizationResources = fileName -> {
+            events.add("loc-read " + fileName);
+            if (fileName.equals("english.properties")) {
+                throw new NoClassDefFoundError("simulated missing class");
+            }
+            return resources.read(fileName);
+        };
+
+        Outcome outcome = launch(LoggingMode.DEFAULT, recordingLogOperations(text -> { }, false));
+
+        assertEquals(1, outcome.exit());
+        assertFalse(harness.infrastructureStarted.get());
+        assertEquals(1, outcome.withLevel("ERROR").size(), outcome.log());
+        assertTrue(outcome.withLevel("ERROR").get(0).contains("java.lang.NoClassDefFoundError"));
+        assertTrue(harness.stderr().isEmpty(), "nothing escapes to stderr: " + harness.stderr());
+        int error = indexContaining(FAILURE);
+        int release = events.indexOf("log-release");
+        assertTrue(error >= 0 && error < release && release < events.indexOf("log-close"), events.toString());
+        assertLogOwnershipReleased(harness.logFile());
+    }
+
+    @Test
     void logWriteFailureFallsBackToStderrAndStillReleasesTheLog() throws Exception {
         prepare();
         arrange(Fatal.ENGLISH_FALLBACK);
