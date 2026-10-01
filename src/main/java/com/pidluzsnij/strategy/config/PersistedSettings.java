@@ -43,6 +43,21 @@ public final class PersistedSettings {
         return current;
     }
 
+    /** @return whether a proper prefix of {@code path} is present but is not a table */
+    boolean hasNonTableSection(List<String> path) {
+        Object current = root;
+        for (String key : path.subList(0, path.size() - 1)) {
+            current = ((Map<?, ?>) current).get(key);
+            if (current == null) {
+                return false;
+            }
+            if (!(current instanceof Map<?, ?>)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static Map<String, Object> copyTable(Map<String, ?> table) {
         Map<String, Object> copy = new LinkedHashMap<>();
         table.forEach((key, value) -> copy.put(Objects.requireNonNull(key, "key"), copyValue(value)));

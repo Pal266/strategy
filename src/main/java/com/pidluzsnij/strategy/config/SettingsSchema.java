@@ -57,6 +57,20 @@ public final class SettingsSchema {
         return false;
     }
 
+    /**
+     * @return whether {@code path} is a proper prefix of a recognized setting that is invalid, rather than
+     * missing, when its section is not a table
+     */
+    boolean isTablePathOfSettingInvalidWhenNotATable(List<String> path) {
+        for (Setting<?> setting : settings) {
+            if (setting.isInvalidWhenSectionIsNotATable() && setting.path().size() > path.size()
+                    && isPrefix(path, setting.path())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isPrefix(List<String> prefix, List<String> path) {
         return prefix.size() <= path.size() && path.subList(0, prefix.size()).equals(prefix);
     }

@@ -140,6 +140,7 @@ final class ConfigurationStartup {
         return switch (invalid.reason()) {
             case INCOMPATIBLE_TYPE -> "incompatible type; expected " + invalid.expectedType();
             case FAILED_VALIDATION -> "failed validation";
+            case SECTION_NOT_A_TABLE -> "enclosing section is not a table";
         };
     }
 

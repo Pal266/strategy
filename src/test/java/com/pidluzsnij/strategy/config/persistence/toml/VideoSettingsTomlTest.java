@@ -43,7 +43,7 @@ class VideoSettingsTomlTest {
         String text = savedText(settings);
 
         CommentedConfig parsed = TomlConfigurationPersistenceTest.parseToml10(text);
-        assertEquals(List.of("video"), List.copyOf(parsed.valueMap().keySet()));
+        assertEquals(java.util.Set.of("video", "localization"), java.util.Set.copyOf(parsed.valueMap().keySet()));
         assertEquals(false, parsed.get("video.fullscreen"));
         assertInstanceOf(Number.class, parsed.get("video.resolution.width"));
         assertInstanceOf(Number.class, parsed.get("video.resolution.height"));
@@ -86,6 +86,9 @@ class VideoSettingsTomlTest {
                 [video.resolution]
                 width = 2560
                 height = 1440
+
+                [localization]
+                language = "en"
                 """);
 
         LoadResult.Loaded loaded = assertInstanceOf(LoadResult.Loaded.class, persistence().load());

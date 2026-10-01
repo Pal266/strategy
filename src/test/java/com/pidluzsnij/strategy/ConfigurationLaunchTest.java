@@ -360,8 +360,9 @@ class ConfigurationLaunchTest {
 
         assertEquals(LoggingMode.DEFAULT, normal.mode());
         assertEquals(ApplicationSettings.SCHEMA, normal.settingsSchema());
-        assertEquals(List.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION), normal.settingsSchema().settings(),
-                "no logging-mode setting; only the video settings");
+        assertEquals(List.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION,
+                        com.pidluzsnij.strategy.config.LocalizationSettings.LANGUAGE),
+                normal.settingsSchema().settings(), "no logging-mode setting; only the video and language settings");
     }
 
     @ParameterizedTest
