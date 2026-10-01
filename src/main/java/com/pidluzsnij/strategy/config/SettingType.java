@@ -2,6 +2,7 @@ package com.pidluzsnij.strategy.config;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Value type of a setting: converts a persisted, format-independent value to the
@@ -85,7 +86,7 @@ public abstract class SettingType<T> {
     private final String name;
     private final Class<T> javaType;
 
-    private SettingType(String name, Class<T> javaType) {
+    SettingType(String name, Class<T> javaType) {
         this.name = name;
         this.javaType = javaType;
     }
@@ -108,6 +109,14 @@ public abstract class SettingType<T> {
     /** @return whether a non-null value is representable by this type */
     boolean accepts(T value) {
         return true;
+    }
+
+    /**
+     * @return the keys of the table that persists one value of this type, or an empty set when
+     * values are not persisted as tables; other keys in such a table are unknown settings
+     */
+    Set<String> tableKeys() {
+        return Set.of();
     }
 
     T cast(Object value) {

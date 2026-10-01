@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Root application-settings model: an immutable, complete snapshot holding a valid
@@ -16,11 +17,8 @@ import java.util.Optional;
  */
 public final class ApplicationSettings {
 
-    /**
-     * Settings recognized by the application. Concrete settings are introduced by later
-     * specifications; the configuration infrastructure itself defines none.
-     */
-    public static final SettingsSchema SCHEMA = SettingsSchema.of();
+    /** Settings recognized by the application. */
+    public static final SettingsSchema SCHEMA = SettingsSchema.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION);
 
     private final SettingsSchema schema;
     private final Map<Setting<?>, Object> values;
@@ -79,7 +77,9 @@ public final class ApplicationSettings {
                                        List<String> unknown) {
         for (Map.Entry<String, Object> entry : table.entrySet()) {
             List<String> path = append(tablePath, entry.getKey());
-            if (schema.settingAt(path).isPresent()) {
+            Optional<Setting<?>> setting = schema.settingAt(path);
+            if (setting.isPresent()) {
+                collectUnknownTableKeys(setting.get(), path, entry.getValue(), unknown);
                 continue;
             }
             if (entry.getValue() instanceof Map<?, ?> && schema.isTablePath(path)) {
@@ -88,6 +88,20 @@ public final class ApplicationSettings {
                 collectLeaves(path, entry.getValue(), unknown);
             }
         }
+    }
+
+    /** Reports keys of a table-persisted setting's table that are not part of its representation. */
+    private static void collectUnknownTableKeys(Setting<?> setting, List<String> path, Object value,
+                                                List<String> unknown) {
+        Set<String> keys = setting.type().tableKeys();
+        if (keys.isEmpty() || !(value instanceof Map<?, ?>)) {
+            return;
+        }
+        asTable(value).forEach((key, child) -> {
+            if (!keys.contains(key)) {
+                collectLeaves(append(path, key), child, unknown);
+            }
+        });
     }
 
     /** Reports every leaf of an unknown subtree, or the subtree itself when it has none. */

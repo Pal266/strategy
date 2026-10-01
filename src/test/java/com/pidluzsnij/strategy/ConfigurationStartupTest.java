@@ -159,9 +159,14 @@ class ConfigurationStartupTest {
     @Test
     void firstRunStartsTheApplicationAfterConfiguration() throws Exception {
         prepare();
+        // The window needs the production video settings, so this run uses the production schema.
+        harness.settingsSchema = ApplicationSettings.SCHEMA;
         launch(LoggingMode.DEFAULT, 0);
         assertTrue(harness.infrastructureStarted.get());
-        assertCompleteSnapshot(settingsFile(), ApplicationSettings.defaults(SCHEMA));
+        CommentedConfig persisted = parse(settingsFile());
+        assertEquals(true, persisted.get("video.fullscreen"));
+        assertEquals("auto", persisted.get("video.resolution.width"));
+        assertEquals("auto", persisted.get("video.resolution.height"));
     }
 
     // --- Fatal failures -------------------------------------------------------------------
@@ -462,16 +467,20 @@ class ConfigurationStartupTest {
     // --- Scope ----------------------------------------------------------------------------
 
     @Test
-    void productionSchemaFirstRunPersistsAnEmptyValidSnapshot() throws Exception {
+    void productionSchemaFirstRunPersistsTheDefaultVideoSettings() throws Exception {
         harness = new LogHarness(temp);
         assertEquals(ApplicationSettings.SCHEMA, harness.settingsSchema);
         SettingsSchema production = harness.settingsSchema;
-        assertTrue(production.settings().isEmpty());
+        assertEquals(2, production.settings().size());
 
         FakeWindowSystem windowSystem = new FakeWindowSystem();
         assertEquals(0, harness.launch(LoggingMode.DEFAULT, windowSystem), harness.stderr());
 
-        assertTrue(parse(harness.settingsFile()).isEmpty());
+        CommentedConfig persisted = parse(harness.settingsFile());
+        assertEquals(List.of("video"), List.copyOf(persisted.valueMap().keySet()));
+        assertEquals(true, persisted.get("video.fullscreen"));
+        assertEquals("auto", persisted.get("video.resolution.width"));
+        assertEquals("auto", persisted.get("video.resolution.height"));
         assertEquals("My strategy", windowSystem.createdSettings.title());
         assertTrue(windowSystem.createdSettings.fullscreen());
         assertEquals(1920, windowSystem.createdResolution.width());

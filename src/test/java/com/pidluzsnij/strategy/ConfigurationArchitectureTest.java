@@ -40,6 +40,7 @@ class ConfigurationArchitectureTest {
     private static final String PERSISTENCE = BASE + "config/persistence/";
     private static final String TOML = BASE + "config/persistence/toml/";
     private static final String NIGHT_CONFIG = "com/electronwill/";
+    private static final String LWJGL = "org/lwjgl/";
 
     /** Production class name (internal form) to the constant-pool strings it references. */
     private static Map<String, Set<String>> classes;
@@ -121,7 +122,27 @@ class ConfigurationArchitectureTest {
     void applicationSettingsKnowsNothingOfFormatStorageOrStartup() {
         assertEquals(List.of(), violations(MODEL, NIGHT_CONFIG, "java/nio/file/", "java/io/File", "dev/dirs/",
                 PERSISTENCE, BASE + "ApplicationLauncher", BASE + "ConfigurationStartup", BASE + "window/",
-                BASE + "logging/", "org/slf4j/", "ch/qos/"));
+                BASE + "logging/", "org/slf4j/", "ch/qos/", LWJGL));
+    }
+
+    @Test
+    void videoSettingsDefaultsAndValidationBelongToTheModel() {
+        for (String name : List.of(MODEL + "VideoSettings", MODEL + "VideoResolution",
+                MODEL + "VideoResolution$Automatic", MODEL + "VideoResolution$Explicit")) {
+            assertTrue(classes.containsKey(name), name);
+        }
+        assertTrue(classes.get(MODEL + "VideoSettings").stream().anyMatch(s -> s.contains(MODEL + "SettingType")));
+        assertTrue(classes.get(MODEL + "ApplicationSettings").stream().anyMatch(s -> s.contains(MODEL + "VideoSettings")));
+    }
+
+    @Test
+    void startupResolutionIsResolvedByWindowingOutsidePersistence() {
+        assertEquals(List.of(), violations(BASE + "window/", PERSISTENCE, NIGHT_CONFIG, "java/nio/file/",
+                "dev/dirs/"));
+        assertTrue(classes.get(BASE + "window/ResolutionResolver").stream()
+                .anyMatch(s -> s.contains(MODEL + "VideoResolution")));
+        assertTrue(classes.get(BASE + "window/LwjglWindowSystem").stream().anyMatch(s -> s.contains(LWJGL)));
+        assertEquals(List.of(), violations(TOML, MODEL + "VideoSettings", MODEL + "VideoResolution", LWJGL));
     }
 
     @Test
@@ -133,7 +154,7 @@ class ConfigurationArchitectureTest {
     @Test
     void tomlImplementationHasNoStartupPolicy() {
         assertEquals(List.of(), violations(TOML, BASE + "ApplicationLauncher", BASE + "ConfigurationStartup",
-                BASE + "window/", BASE + "logging/", "org/slf4j/", "ch/qos/"));
+                BASE + "window/", BASE + "logging/", "org/slf4j/", "ch/qos/", LWJGL));
     }
 
     @Test
