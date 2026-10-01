@@ -13,6 +13,7 @@ public final class DirectoriesLogLocation implements LogLocation {
     @Override
     public Path configDirectory() {
         String configDir = BaseDirectories.get().configDir;
+        System.out.println(configDir);
         if (configDir == null || configDir.isBlank()) {
             throw new IllegalStateException("the operating system did not report a per-user configuration directory");
         }
