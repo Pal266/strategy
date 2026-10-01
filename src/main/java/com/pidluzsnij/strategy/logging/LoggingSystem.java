@@ -86,38 +86,51 @@ public final class LoggingSystem implements AutoCloseable {
             throw failure(Reason.FILE_OPEN_FAILED, file, "could not open log file: " + describe(e), e);
         }
 
-        FileLock lock;
+        // From here on, any failure (including an Error) releases what has been acquired.
+        FileLock lock = null;
+        boolean initialized = false;
+        boolean configuring = false;
         try {
-            lock = fileOperations.tryLock(channel);
-        } catch (OverlappingFileLockException e) {
-            lock = null;
-        } catch (Exception e) {
-            closeQuietly(fileOperations, channel);
-            throw failure(Reason.OWNERSHIP_ACQUISITION_FAILED, file,
-                    "could not acquire exclusive ownership of log file: " + describe(e), e);
-        }
-        if (lock == null) {
-            closeQuietly(fileOperations, channel);
-            throw failure(Reason.FILE_IN_USE, file,
-                    "log file is already in use by another application instance", null);
-        }
+            try {
+                lock = fileOperations.tryLock(channel);
+            } catch (OverlappingFileLockException e) {
+                lock = null;
+            } catch (Exception e) {
+                throw failure(Reason.OWNERSHIP_ACQUISITION_FAILED, file,
+                        "could not acquire exclusive ownership of log file: " + describe(e), e);
+            }
+            if (lock == null) {
+                throw failure(Reason.FILE_IN_USE, file,
+                        "log file is already in use by another application instance", null);
+            }
 
-        try {
-            fileOperations.truncate(channel);
-        } catch (Exception e) {
-            releaseQuietly(fileOperations, lock);
-            closeQuietly(fileOperations, channel);
-            throw failure(Reason.TRUNCATION_FAILED, file, "could not empty log file: " + describe(e), e);
-        }
+            try {
+                fileOperations.truncate(channel);
+            } catch (Exception e) {
+                throw failure(Reason.TRUNCATION_FAILED, file, "could not empty log file: " + describe(e), e);
+            }
 
-        try {
-            LoggerContext context = configure(mode, channel, file, fileOperations, stderr);
-            return new LoggingSystem(context, channel, lock, file, fileOperations, stderr);
-        } catch (RuntimeException e) {
-            releaseQuietly(fileOperations, lock);
-            closeQuietly(fileOperations, channel);
-            throw failure(Reason.CONFIGURATION_FAILED, file,
-                    "could not configure diagnostic logging: " + describe(e), e);
+            LoggingSystem logging;
+            configuring = true;
+            try {
+                LoggerContext context = configure(mode, channel, file, fileOperations, stderr);
+                logging = new LoggingSystem(context, channel, lock, file, fileOperations, stderr);
+            } catch (RuntimeException e) {
+                throw failure(Reason.CONFIGURATION_FAILED, file,
+                        "could not configure diagnostic logging: " + describe(e), e);
+            }
+            initialized = true;
+            return logging;
+        } finally {
+            if (!initialized) {
+                if (configuring) {
+                    detachQuietly();
+                }
+                if (lock != null) {
+                    releaseQuietly(fileOperations, lock);
+                }
+                closeQuietly(fileOperations, channel);
+            }
         }
     }
 
@@ -190,6 +203,17 @@ public final class LoggingSystem implements AutoCloseable {
     private static String describe(Throwable e) {
         String message = e.getMessage();
         return message == null ? e.getClass().getName() : e.getClass().getSimpleName() + ": " + message;
+    }
+
+    /** Removes any partially configured appender so nothing writes to the closed file. */
+    private static void detachQuietly() {
+        try {
+            if (LoggerFactory.getILoggerFactory() instanceof LoggerContext context) {
+                context.reset();
+            }
+        } catch (RuntimeException ignored) {
+            // Already failing; the original failure is reported.
+        }
     }
 
     private static void releaseQuietly(FileOperations fileOperations, FileLock lock) {

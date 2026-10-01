@@ -277,6 +277,67 @@ class LoggingSystemTest {
         assertEquals(1, count(log, "Application startup begins"));
     }
 
+    // --- Initialization resources released on Error --------------------------------------
+
+    @Test
+    void errorDuringTruncationReleasesOwnershipAndClosesTheFile() throws Exception {
+        assertErrorReleasesResources(new FileOperations() {
+            @Override
+            public void truncate(FileChannel channel) {
+                throw new AssertionError("simulated error during truncation");
+            }
+        }, "simulated error during truncation", true);
+    }
+
+    @Test
+    void errorDuringOwnershipAcquisitionClosesTheFile() throws Exception {
+        assertErrorReleasesResources(new FileOperations() {
+            @Override
+            public FileLock tryLock(FileChannel channel) {
+                throw new AssertionError("simulated error during locking");
+            }
+        }, "simulated error during locking", false);
+    }
+
+    private void assertErrorReleasesResources(FileOperations failing, String message, boolean lockAcquired)
+            throws Exception {
+        LogHarness harness = new LogHarness(temp);
+        List<String> events = new java.util.ArrayList<>();
+        FileOperations recording = new FileOperations() {
+            @Override
+            public FileLock tryLock(FileChannel channel) throws IOException {
+                FileLock lock = failing.tryLock(channel);
+                events.add("locked");
+                return lock;
+            }
+
+            @Override
+            public void truncate(FileChannel channel) throws IOException {
+                failing.truncate(channel);
+            }
+
+            @Override
+            public void release(FileLock lock) throws IOException {
+                events.add("release");
+                FileOperations.super.release(lock);
+            }
+
+            @Override
+            public void close(FileChannel channel) throws IOException {
+                events.add("close");
+                FileOperations.super.close(channel);
+            }
+        };
+
+        AssertionError error = assertThrows(AssertionError.class, () ->
+                LoggingSystem.initialize(LoggingMode.DEFAULT, harness.location(), recording, harness.stderr));
+
+        assertEquals(message, error.getMessage());
+        assertEquals(lockAcquired ? List.of("locked", "release", "close") : List.of("close"), events);
+        LoggingSystem.initialize(LoggingMode.DEFAULT, harness.location(), FileOperations.SYSTEM, harness.stderr)
+                .close();
+    }
+
     @Test
     void closeReleasesOwnershipSoTheFileCanBeOwnedAgain() throws Exception {
         LogHarness harness = new LogHarness(temp);
