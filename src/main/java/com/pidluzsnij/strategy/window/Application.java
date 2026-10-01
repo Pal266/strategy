@@ -1,6 +1,8 @@
 package com.pidluzsnij.strategy.window;
 
 import com.pidluzsnij.strategy.config.ApplicationSettings;
+import com.pidluzsnij.strategy.config.VideoResolution;
+import com.pidluzsnij.strategy.config.VideoSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,13 +23,15 @@ public final class Application {
     private final WindowSystem windowSystem;
     private final RuntimeEnvironment runtime;
     private final WindowSettings settings;
+    private final VideoResolution configuredResolution;
     private final ApplicationSettings applicationSettings;
 
     public Application(WindowSystem windowSystem, RuntimeEnvironment runtime,
                        ApplicationSettings applicationSettings) {
         this.windowSystem = windowSystem;
         this.runtime = runtime;
-        this.settings = WindowSettings.initial();
+        this.settings = WindowSettings.from(applicationSettings);
+        this.configuredResolution = applicationSettings.get(VideoSettings.RESOLUTION);
         this.applicationSettings = applicationSettings;
     }
 
@@ -42,6 +46,8 @@ public final class Application {
                 orUnavailable(runtime.javaVersion()), orUnavailable(runtime.osName()),
                 orUnavailable(runtime.osVersion()), orUnavailable(runtime.architecture()),
                 orUnavailable(runtime.lwjglVersion()));
+        log.debug("Effective video settings selected for startup: fullscreen {}, resolution selection {}",
+                settings.fullscreen(), describeSelection(configuredResolution));
 
         try {
             windowSystem.initialize(this::onGlfwError);
@@ -107,13 +113,20 @@ public final class Application {
                     mode == null ? UNAVAILABLE : mode.width() + "×" + mode.height(),
                     mode == null || mode.refreshRate() <= 0 ? UNAVAILABLE : mode.refreshRate() + " Hz");
         }
-        Resolution resolution = ResolutionResolver.resolve(mode);
-        if (!ResolutionResolver.isDetermined(mode)) {
+        ResolvedResolution resolved = ResolutionResolver.resolve(configuredResolution, mode);
+        if (resolved.source() == ResolutionSource.AUTOMATIC_FALLBACK) {
             String reason = monitor.unavailableReason();
             log.warn("Starting monitor resolution could not be determined (reason: {}); using fallback resolution {}",
                     reason == null ? UNAVAILABLE : reason, Resolution.FALLBACK);
         }
-        return resolution;
+        log.debug("Startup resolution resolved: {} (source: {})", resolved.resolution(), resolved.source());
+        return resolved.resolution();
+    }
+
+    private static String describeSelection(VideoResolution resolution) {
+        return resolution instanceof VideoResolution.Explicit explicit
+                ? "explicit " + explicit.width() + "×" + explicit.height()
+                : "automatic";
     }
 
     private void onGlfwError(int code, String description) {

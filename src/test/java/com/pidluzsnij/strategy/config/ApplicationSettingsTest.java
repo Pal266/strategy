@@ -36,10 +36,10 @@ class ApplicationSettingsTest {
     }
 
     @Test
-    void productionModelDefinesNoConcreteSettings() {
-        assertTrue(ApplicationSettings.SCHEMA.settings().isEmpty());
+    void productionModelDefinesOnlyTheVideoSettings() {
+        assertEquals(List.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION), ApplicationSettings.SCHEMA.settings());
         ApplicationSettings defaults = ApplicationSettings.defaults(ApplicationSettings.SCHEMA);
-        assertTrue(defaults.toPersisted().root().isEmpty());
+        assertEquals(List.of("video"), List.copyOf(defaults.toPersisted().root().keySet()));
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.pidluzsnij.strategy;
 
 import ch.qos.logback.classic.LoggerContext;
 import com.pidluzsnij.strategy.config.ApplicationSettings;
+import com.pidluzsnij.strategy.config.VideoSettings;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistenceException;
 import com.pidluzsnij.strategy.config.persistence.LoadResult;
 import com.pidluzsnij.strategy.config.persistence.toml.TomlConfigurationPersistence;
@@ -359,7 +360,8 @@ class ConfigurationLaunchTest {
 
         assertEquals(LoggingMode.DEFAULT, normal.mode());
         assertEquals(ApplicationSettings.SCHEMA, normal.settingsSchema());
-        assertTrue(normal.settingsSchema().settings().isEmpty(), "no logging-mode or other production setting");
+        assertEquals(List.of(VideoSettings.FULLSCREEN, VideoSettings.RESOLUTION), normal.settingsSchema().settings(),
+                "no logging-mode setting; only the video settings");
     }
 
     @ParameterizedTest

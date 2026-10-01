@@ -35,6 +35,9 @@ public final class FakeWindowSystem implements WindowSystem {
     public Runnable onProcessEvents = () -> { };
     public Runnable onDestroyWindow = () -> { };
 
+    /** State reported by the platform after creation; by default the requested settings and resolution. */
+    public WindowState actualState;
+
     public WindowSettings createdSettings;
     public Resolution createdResolution;
     public int framesRendered;
@@ -114,6 +117,9 @@ public final class FakeWindowSystem implements WindowSystem {
 
     @Override
     public WindowState windowState() {
+        if (actualState != null) {
+            return actualState;
+        }
         return new WindowState(createdResolution, createdSettings.fullscreen());
     }
 

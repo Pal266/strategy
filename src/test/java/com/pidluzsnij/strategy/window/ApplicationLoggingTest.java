@@ -180,7 +180,7 @@ class ApplicationLoggingTest {
             assertTrue(withLevel(records, "DEBUG").isEmpty(), records.toString());
             return;
         }
-        assertEquals(5, debug.size(), debug.toString());
+        assertEquals(7, debug.size(), debug.toString());
         assertTrue(has(debug, "DEBUG", "Java 21.0.42-test, OS TestOS 9.8.7, architecture test-arch, LWJGL 3.4.3-test"));
         assertTrue(has(debug, "DEBUG", "Starting monitor: name Probe Monitor 27, resolution 2560×1440, "
                 + "refresh rate 144 Hz"));
@@ -222,8 +222,9 @@ class ApplicationLoggingTest {
 
         assertTrue(windowSystem.framesRendered > 500);
         assertTrue(withLevel(records, "TRACE").isEmpty());
-        // Startup, runtime, monitor, OpenGL, window opened, close request, release, normal shutdown.
-        assertEquals(8, withoutConfiguration(records).size(), records.toString());
+        // Startup, runtime, video selection, monitor, resolution, OpenGL, window opened, close request,
+        // release, normal shutdown.
+        assertEquals(10, withoutConfiguration(records).size(), records.toString());
     }
 
     // --- Shutdown ordering and resource release -------------------------------------------
