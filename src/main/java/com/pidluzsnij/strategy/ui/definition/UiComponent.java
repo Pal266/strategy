@@ -16,8 +16,17 @@ public sealed interface UiComponent {
     /** @return the component's bounds in logical coordinates */
     Bounds bounds();
 
-    /** An image stretched over the component bounds. */
-    record Image(String id, Bounds bounds, UiResourcePath image) implements UiComponent {
+    /**
+     * @return whether the component stops pointer input from reaching interactive components drawn below it;
+     * interactive components always do
+     */
+    boolean blocking();
+
+    /**
+     * An image stretched over the component bounds. A non-blocking image is a decoration that pointer input
+     * passes through.
+     */
+    record Image(String id, Bounds bounds, UiResourcePath image, boolean blocking) implements UiComponent {
         public Image {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(bounds, "bounds");
@@ -25,8 +34,8 @@ public sealed interface UiComponent {
         }
     }
 
-    /** Localized text within the component bounds. */
-    record Text(String id, Bounds bounds, TextStyle text) implements UiComponent {
+    /** Localized text within the component bounds. Non-blocking text lets pointer input pass through. */
+    record Text(String id, Bounds bounds, TextStyle text, boolean blocking) implements UiComponent {
         public Text {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(bounds, "bounds");
@@ -51,6 +60,11 @@ public sealed interface UiComponent {
                 Objects.requireNonNull(copy.get(state), "state " + state.id());
             }
             states = java.util.Collections.unmodifiableMap(copy);
+        }
+
+        @Override
+        public boolean blocking() {
+            return true;
         }
 
         /** @return the image resource for {@code state} */

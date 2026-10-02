@@ -79,9 +79,9 @@ class UiDefinitionParserTest {
         assertEquals(List.of("background", "title", "start"), a.components().stream().map(UiComponent::id).toList());
         assertEquals(List.of("title", "start", "background"), b.components().stream().map(UiComponent::id).toList());
 
-        assertEquals(new UiComponent.Image("background", new Bounds(0, 0, 1920, 1080), UiResourcePath.of("images/bg-a.png")),
+        assertEquals(new UiComponent.Image("background", new Bounds(0, 0, 1920, 1080), UiResourcePath.of("images/bg-a.png"), true),
                 a.component("background"));
-        assertEquals(new UiComponent.Image("background", new Bounds(5, 6, 700, 800), UiResourcePath.of("images/bg-b.png")),
+        assertEquals(new UiComponent.Image("background", new Bounds(5, 6, 700, 800), UiResourcePath.of("images/bg-b.png"), true),
                 b.component("background"));
         assertEquals(new TextStyle("test.title", UiResourcePath.of("fonts/a.ttf"), 48, new UiColor(255, 255, 255, 255),
                 TextAlign.LEFT), ((UiComponent.Text) a.component("title")).text());
@@ -101,6 +101,41 @@ class UiDefinitionParserTest {
         assertEquals(TextAlign.LEFT, startB.label().orElseThrow().align(), "alignment defaults to left");
         assertEquals(20, startB.label().orElseThrow().size());
         assertEquals("fonts/b.ttf", startB.label().orElseThrow().font().value());
+    }
+
+    @Test
+    void decorationsCanBeMarkedAsNotBlocking() throws Exception {
+        UiDefinition parsed = parse(definition(100, 100,
+                image("solid", 0, 0, 10, 10, "images/a.png"),
+                "{\"id\": \"glow\", \"type\": \"image\", \"x\": 0, \"y\": 0, \"width\": 10, \"height\": 10, "
+                        + "\"image\": \"images/glow.png\", \"blocking\": false}",
+                "{\"id\": \"caption\", \"type\": \"text\", \"x\": 0, \"y\": 0, \"width\": 10, \"height\": 10, "
+                        + "\"blocking\": false, \"text\": " + style("k", "fonts/a.ttf", 10, "#FFFFFF", null) + "}",
+                "{\"id\": \"explicit\", \"type\": \"image\", \"x\": 0, \"y\": 0, \"width\": 10, \"height\": 10, "
+                        + "\"image\": \"images/a.png\", \"blocking\": true}",
+                button("start", 0, 0, 10, 10, "test.start", "a.png", "b.png", "c.png", null)));
+
+        assertTrue(parsed.component("solid").blocking(), "components block by default");
+        assertFalse(parsed.component("glow").blocking());
+        assertFalse(parsed.component("caption").blocking());
+        assertTrue(parsed.component("explicit").blocking());
+        assertTrue(parsed.component("start").blocking(), "interactive components always block");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"false\"", "0", "null", "[]"})
+    void blockingMustBeABoolean(String value) {
+        assertTrue(rejected(definition(100, 100, "{\"id\": \"a\", \"type\": \"image\", \"x\": 0, \"y\": 0, "
+                + "\"width\": 10, \"height\": 10, \"image\": \"a.png\", \"blocking\": " + value + "}"))
+                .reason().contains("'blocking'"));
+    }
+
+    @Test
+    void buttonsCannotBeMarkedAsNotBlocking() {
+        String component = "{\"id\": \"start\", \"type\": \"button\", \"x\": 0, \"y\": 0, \"width\": 10, "
+                + "\"height\": 10, \"behavior\": \"test.start\", \"states\": {\"normal\": \"a.png\", "
+                + "\"hovered\": \"b.png\", \"pressed\": \"c.png\"}, \"blocking\": false}";
+        assertTrue(rejected(definition(100, 100, component)).reason().contains("unsupported member 'blocking'"));
     }
 
     @Test

@@ -324,6 +324,36 @@ class UiFoundationTest {
     }
 
     @Test
+    void blockingImagesOverAButtonStopInputWhileDecorationsLetItThrough() throws Exception {
+        String decoration = "{\"id\": \"glow\", \"type\": \"image\", \"x\": 600, \"y\": 400, \"width\": 200, "
+                + "\"height\": 100, \"image\": \"images/bg.png\", \"blocking\": false}";
+        UiFixtures.ResourceSet set = bundledSet().put("screens/layers.json", definition(1600, 900,
+                image("background", 0, 0, 1600, 900, "images/bg.png"),
+                button("start", 600, 400, 400, 100, "test.start", "images/normal.png", "images/hovered.png",
+                        "images/pressed.png", null),
+                decoration,
+                image("panel", 800, 400, 200, 100, "images/bg.png")));
+        UiFoundation ui = initialize(set, List.of("screens/layers.json"), 1600, 900);
+        UiScreen screen = ui.requiredScreen(path("screens/layers.json")).orElseThrow();
+        List<UiActivation> activations = new ArrayList<>();
+        ui.show(screen, activations::add);
+        PointerListener pointer = ui.pointerListener();
+
+        pointer.pointerMoved(700, 450, 1600, 900);
+        assertEquals(VisualState.HOVERED, screen.state("start"), "the decoration lets input through");
+        pointer.primaryButton(true, 700, 450, 1600, 900);
+        pointer.primaryButton(false, 700, 450, 1600, 900);
+        assertEquals(List.of(new UiActivation("start", "test.start")), activations);
+
+        pointer.pointerMoved(900, 450, 1600, 900);
+        assertEquals(VisualState.NORMAL, screen.state("start"), "the blocking panel hides the button there");
+        pointer.primaryButton(true, 900, 450, 1600, 900);
+        pointer.primaryButton(false, 900, 450, 1600, 900);
+        assertEquals(1, activations.size());
+        ui.close();
+    }
+
+    @Test
     void pointerInTheUnusedFramebufferAreaDoesNotInteract() throws Exception {
         UiFixtures.ResourceSet set = bundledSet().put("screens/edge.json", definition(1600, 900,
                 button("edge", -100, 0, 300, 900, "test.start", "images/normal.png", "images/hovered.png",

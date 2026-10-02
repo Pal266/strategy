@@ -11,7 +11,8 @@ import java.util.Optional;
 /**
  * Pointer interaction state of the interactive components of one UI.
  * <ul>
- *     <li>Without a held primary button, the topmost component under the pointer is hovered.</li>
+ *     <li>Without a held primary button, the topmost interactive component under the pointer is hovered,
+ *     unless a blocking component is drawn over it at that point.</li>
  *     <li>A press that begins on a component captures it: the component is pressed while the pointer is
  *     inside it and normal while outside; releasing inside it produces one activation.</li>
  *     <li>A press that begins on no component captures nothing: no component is hovered or pressed until
@@ -22,18 +23,30 @@ import java.util.Optional;
  */
 public final class UiInteraction {
 
-    /** An interactive component: identifier, logical bounds and semantic behavior identifier. */
+    /**
+     * A component taking part in hit testing: an interactive component with its semantic behavior identifier,
+     * or a blocking component ({@code behavior} {@code null}) that stops pointer input from reaching
+     * interactive components below it.
+     */
     public record Target(String id, Bounds bounds, String behavior) {
         public Target {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(bounds, "bounds");
-            Objects.requireNonNull(behavior, "behavior");
+        }
+
+        /** @return a target that blocks pointer input without being interactive */
+        public static Target blocker(String id, Bounds bounds) {
+            return new Target(id, bounds, null);
+        }
+
+        public boolean interactive() {
+            return behavior != null;
         }
     }
 
     private final int logicalWidth;
     private final int logicalHeight;
-    /** In rendering order; later targets are on top. */
+    /** Interactive and blocking components in rendering order; later targets are on top. */
     private final List<Target> targets;
 
     private Target hovered;
@@ -89,8 +102,10 @@ public final class UiInteraction {
     private Target hit(double x, double y, int framebufferWidth, int framebufferHeight) {
         LayoutTransform transform = LayoutTransform.fit(logicalWidth, logicalHeight, framebufferWidth, framebufferHeight);
         for (int i = targets.size() - 1; i >= 0; i--) {
-            if (transform.hits(targets.get(i).bounds(), x, y)) {
-                return targets.get(i);
+            Target target = targets.get(i);
+            if (transform.hits(target.bounds(), x, y)) {
+                // The topmost hit decides: an interactive component, or a blocker hiding what lies below.
+                return target.interactive() ? target : null;
             }
         }
         return null;

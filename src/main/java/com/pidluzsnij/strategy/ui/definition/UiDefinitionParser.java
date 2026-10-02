@@ -26,6 +26,9 @@ import java.util.regex.Pattern;
  * native libraries or any other executable construct. Behavior identifiers are accepted only when the
  * application declares them as supported; their meaning stays with application code.
  * <p>
+ * Image and text components block pointer input to interactive components drawn below them unless they
+ * declare {@code "blocking": false}, which marks them as decorations that pointer input passes through.
+ * <p>
  * A definition is either completely valid, producing a {@link UiDefinition}, or rejected as a whole.
  *
  * <pre>{@code
@@ -34,6 +37,8 @@ import java.util.regex.Pattern;
  *   "components": [
  *     { "id": "background", "type": "image", "x": 0, "y": 0, "width": 1920, "height": 1080,
  *       "image": "images/background.png" },
+ *     { "id": "glow", "type": "image", "x": 740, "y": 480, "width": 440, "height": 140,
+ *       "image": "images/glow.png", "blocking": false },
  *     { "id": "title", "type": "text", "x": 560, "y": 100, "width": 800, "height": 120,
  *       "text": { "key": "some.localization.key", "font": "fonts/main.ttf", "size": 64,
  *                 "color": "#FFFFFF", "align": "center" } },
@@ -158,14 +163,16 @@ public final class UiDefinitionParser {
         Bounds bounds;
         switch (type) {
             case "image" -> {
-                members(map, context, union(COMMON, Set.of("image")), union(COMMON, Set.of("image")));
+                members(map, context, union(COMMON, Set.of("image", "blocking")), union(COMMON, Set.of("image")));
                 bounds = bounds(map, context);
-                return new UiComponent.Image(id, bounds, resource(map, "image", context, IMAGE_EXTENSION));
+                return new UiComponent.Image(id, bounds, resource(map, "image", context, IMAGE_EXTENSION),
+                        blocking(map, context));
             }
             case "text" -> {
-                members(map, context, union(COMMON, Set.of("text")), union(COMMON, Set.of("text")));
+                members(map, context, union(COMMON, Set.of("text", "blocking")), union(COMMON, Set.of("text")));
                 bounds = bounds(map, context);
-                return new UiComponent.Text(id, bounds, textStyle(map.get("text"), context + " text"));
+                return new UiComponent.Text(id, bounds, textStyle(map.get("text"), context + " text"),
+                        blocking(map, context));
             }
             case "button" -> {
                 Set<String> required = union(COMMON, Set.of("behavior", "states"));
@@ -193,6 +200,17 @@ public final class UiDefinitionParser {
             default -> throw new MalformedDefinitionException(context + " has the unsupported type '"
                     + (IDENTIFIER.matcher(type).matches() ? type : "?") + "'");
         }
+    }
+
+    /** @return the optional {@code blocking} member; components block pointer input by default */
+    private static boolean blocking(Map<String, Object> map, String context) throws MalformedDefinitionException {
+        if (!map.containsKey("blocking")) {
+            return true;
+        }
+        if (!(map.get("blocking") instanceof Boolean value)) {
+            throw new MalformedDefinitionException(context + " member 'blocking' must be true or false");
+        }
+        return value;
     }
 
     private static Bounds bounds(Map<String, Object> map, String context) throws MalformedDefinitionException {

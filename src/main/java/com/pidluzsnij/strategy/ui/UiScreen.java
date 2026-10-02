@@ -52,6 +52,8 @@ public final class UiScreen {
         for (UiComponent component : definition.components()) {
             if (component instanceof UiComponent.Button button) {
                 targets.add(new UiInteraction.Target(button.id(), button.bounds(), button.behavior()));
+            } else if (component.blocking()) {
+                targets.add(UiInteraction.Target.blocker(component.id(), component.bounds()));
             }
         }
         this.interaction = new UiInteraction(definition.logicalWidth(), definition.logicalHeight(), targets);
