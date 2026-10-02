@@ -79,9 +79,11 @@ import static org.lwjgl.opengl.GL20.glUseProgram;
 import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 
 /**
- * {@link UiGraphics} drawing textured quads through the application's current OpenGL context. Uses only
- * OpenGL 2.0 / GLSL 1.20 functionality, which every context the window system creates provides, and batches
- * quads that share a texture. Shaders are part of the application, not of the UI resources.
+ * {@link UiGraphics} drawing textured quads through the application's current OpenGL context, batching quads
+ * that share a texture. Requires OpenGL 2.0 / GLSL 1.20. The window system requests no particular OpenGL
+ * version, so this requirement applies only once the UI foundation loads a UI definition and initializes this
+ * renderer; a context without OpenGL 2.0 then fails rendering initialization. Shaders are part of the
+ * application, not of the UI resources.
  */
 public final class GlUiGraphics implements UiGraphics {
 
@@ -132,6 +134,19 @@ public final class GlUiGraphics implements UiGraphics {
 
     @Override
     public void initialize() {
+        try {
+            createRenderingResources();
+        } catch (RuntimeException | LinkageError e) {
+            try {
+                close();
+            } catch (RuntimeException | LinkageError suppressed) {
+                e.addSuppressed(suppressed);
+            }
+            throw e;
+        }
+    }
+
+    private void createRenderingResources() {
         vertices = MemoryUtil.memAllocFloat(MAX_QUADS * VERTICES_PER_QUAD * FLOATS_PER_VERTEX);
         int vertex = compile(GL_VERTEX_SHADER, VERTEX_SHADER, "vertex");
         int fragment = 0;

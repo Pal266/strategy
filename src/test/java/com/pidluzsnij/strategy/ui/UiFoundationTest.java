@@ -579,6 +579,35 @@ class UiFoundationTest {
     }
 
     @Test
+    void renderingIsNotInitializedWhileNoDefinitionIsLoaded() throws Exception {
+        UiFoundation ui = initialize(List.of());
+        ui.render(1600, 900);
+        assertFalse(graphics.events.contains("ui-initialize"));
+        ui.close();
+        assertEquals(1, graphics.closes, "closing uninitialized rendering is safe");
+    }
+
+    @Test
+    void renderingIsInitializedOnceBeforeTheFirstLoadedDefinition() throws Exception {
+        UiFoundation ui = initialize(List.of());
+        ui.load(path("screens/main.json"));
+        ui.load(path("screens/main.json"));
+        assertEquals(1, graphics.events.stream().filter("ui-initialize"::equals).count());
+        assertTrue(graphics.events.indexOf("ui-initialize") < graphics.events.indexOf("ui-createTexture bundled images/bg.png"));
+        ui.close();
+    }
+
+    @Test
+    void deferredRenderingFailureFailsTheLoadWithoutAllocating() throws Exception {
+        UiFoundation ui = initialize(List.of());
+        graphics.initializeFailure = new IllegalStateException("no OpenGL 2.0");
+        UiException failure = assertThrows(UiException.class, () -> ui.load(path("screens/main.json")));
+        assertEquals("initialize UI rendering", failure.stage());
+        assertTrue(graphics.textures.isEmpty());
+        ui.close();
+    }
+
+    @Test
     void releaseFailureDoesNotSuppressLaterReleases() throws Exception {
         UiFoundation ui = initialize(List.of("screens/main.json"));
         graphics.failTextureReleaseFor = "bundled images/bg.png";

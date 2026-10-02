@@ -13,7 +13,10 @@ import com.pidluzsnij.strategy.ui.layout.ScreenRect;
  */
 public interface UiGraphics {
 
-    /** Rendering initialization: creates the shared rendering resources. */
+    /**
+     * Rendering initialization: creates the shared rendering resources. Called once, before the first texture
+     * or text face is created. A failed initialization leaves nothing allocated.
+     */
     void initialize();
 
     /** Creates a texture from a decoded image. */

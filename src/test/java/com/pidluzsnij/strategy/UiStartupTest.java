@@ -345,7 +345,9 @@ class UiStartupTest {
         assertEquals(List.of(), windowSystem.uiGraphics.draws, "no UI element is submitted");
         assertTrue(windowSystem.uiGraphics.textures.isEmpty());
         assertTrue(windowSystem.uiGraphics.faces.isEmpty());
-        assertTrue(harness.log().contains("UI foundation initialized: rendering ready, 0 UI definition(s) loaded"));
+        assertTrue(harness.log().contains("UI foundation initialized: rendering deferred until a UI definition is "
+                + "loaded, 0 UI definition(s) loaded"));
+        assertFalse(events.contains("ui-initialize"), "no UI shaders or buffers are created, so no OpenGL 2.0 is needed");
         assertFalse(harness.log().contains("UI resource '"), "no UI resource is resolved");
         assertFalse(Files.exists(UiResources.externalRoot(harness.configDirectory)), "no external UI directory is created");
     }

@@ -62,6 +62,7 @@ public final class UiFoundation implements AutoCloseable {
     private final Map<UiResourcePath, UiScreen> required = new LinkedHashMap<>();
     private final PointerListener pointerListener = new ActiveScreenPointerListener();
 
+    private boolean renderingInitialized;
     private UiScreen active;
     private Consumer<UiActivation> activationListener = activation -> { };
     private boolean closed;
@@ -88,9 +89,11 @@ public final class UiFoundation implements AutoCloseable {
     }
 
     /**
-     * Initializes the UI foundation after OpenGL initialization: resolves the external override root, creates
-     * the shared rendering resources and loads the required definitions. Success is logged at INFO; a failure
-     * is logged once at ERROR, everything allocated so far is released, and the failure is rethrown.
+     * Initializes the UI foundation after OpenGL initialization: resolves the external override root and loads
+     * the required definitions. The shared rendering resources, which need OpenGL 2.0, are created here when
+     * definitions are required and otherwise when the first definition is loaded, so a startup that loads no UI
+     * makes no additional demands on the OpenGL context. Success is logged at INFO; a failure is logged once at
+     * ERROR, everything allocated so far is released, and the failure is rethrown.
      *
      * @param framebufferWidth  current framebuffer width, used to rasterize text at its displayed size
      * @param framebufferHeight current framebuffer height
@@ -113,14 +116,15 @@ public final class UiFoundation implements AutoCloseable {
             foundation = new UiFoundation(resources, new UiDefinitionParser(configuration.supportedBehaviors()),
                     graphics, localization, framebufferWidth, framebufferHeight);
 
-            progress.enter(STAGE_RENDERING, null);
-            graphics.initialize();
-
+            if (!configuration.requiredDefinitions().isEmpty()) {
+                foundation.initializeRendering(progress);
+            }
             for (UiResourcePath definition : configuration.requiredDefinitions()) {
                 UiScreen screen = foundation.load(definition, progress);
                 foundation.required.put(definition, screen);
             }
-            log.info("UI foundation initialized: rendering ready, {} UI definition(s) loaded, external override root {} ({})",
+            log.info("UI foundation initialized: rendering {}, {} UI definition(s) loaded, external override root {} ({})",
+                    foundation.renderingInitialized ? "ready" : "deferred until a UI definition is loaded",
                     foundation.required.size(), resources.externalRoot(),
                     Files.isDirectory(resources.externalRoot()) ? "present" : "absent");
             return foundation;
@@ -168,8 +172,23 @@ public final class UiFoundation implements AutoCloseable {
         }
     }
 
+    /** Creates the shared rendering resources once, before the first graphics resource. */
+    private void initializeRendering(Progress progress) throws UiException {
+        if (renderingInitialized) {
+            return;
+        }
+        progress.enter(STAGE_RENDERING, null);
+        try {
+            graphics.initialize();
+        } catch (RuntimeException | LinkageError e) {
+            throw new UiException(STAGE_RENDERING, null, "the OpenGL UI renderer could not be created", e);
+        }
+        renderingInitialized = true;
+    }
+
     private UiScreen load(UiResourcePath path, Progress progress) throws UiException {
         ensureOpen();
+        initializeRendering(progress);
         Map<UiResourcePath, UiTexture> textures = new LinkedHashMap<>();
         Map<UiResourcePath, UiFont> fonts = new LinkedHashMap<>();
         Map<UiScreen.FaceKey, UiTextFace> faces = new LinkedHashMap<>();

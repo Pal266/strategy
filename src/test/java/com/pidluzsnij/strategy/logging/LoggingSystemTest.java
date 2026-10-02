@@ -303,7 +303,7 @@ class LoggingSystemTest {
         assertTrue(stderr.contains("simulated disk full during cleanup"), stderr);
         assertTrue(stderr.contains(harness.logFile().toAbsolutePath().toString()), stderr);
         assertEquals(List.of("initialize", "startingMonitor", "createWindow", "initializeGraphics",
-                "createUiGraphics", "ui-initialize", "setPointerListener", "ui-close", "destroyWindow", "terminate"),
+                "createUiGraphics", "setPointerListener", "ui-close", "destroyWindow", "terminate"),
                 windowSystem.events, "cleanup must run to completion");
         assertEquals(0, exit);
 
