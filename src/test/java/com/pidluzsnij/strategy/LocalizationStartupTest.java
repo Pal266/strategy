@@ -582,7 +582,10 @@ class LocalizationStartupTest {
         bundledBefore.forEach((file, bytes) -> assertArrayEquals(bytes, bundledAfter.get(file), file.toString()));
         for (Map.Entry<Path, byte[]> entry : bundledAfter.entrySet()) {
             if (entry.getKey().toString().endsWith(".properties")) {
-                assertEquals(0, entry.getValue().length, "no test translation entered " + entry.getKey());
+                String content = new String(entry.getValue(), StandardCharsets.UTF_8);
+                assertFalse(content.contains("test."), "no test translation entered " + entry.getKey());
+                assertTrue(content.startsWith("application.window.title="), "only the production title key: "
+                        + entry.getKey());
             }
         }
     }
