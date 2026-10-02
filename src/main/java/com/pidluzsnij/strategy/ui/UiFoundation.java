@@ -279,19 +279,26 @@ public final class UiFoundation implements AutoCloseable {
 
     /**
      * Shows {@code screen}: it is rendered every frame and receives pointer input; its activations are passed
-     * to {@code listener}.
+     * to {@code listener}. The screen starts without hover or press; a press begun before it was shown cannot
+     * activate it.
      */
     public void show(UiScreen screen, Consumer<UiActivation> listener) {
         ensureOpen();
         if (!screens.contains(screen)) {
             throw new IllegalArgumentException("the screen does not belong to this UI foundation");
         }
+        Objects.requireNonNull(listener, "listener");
+        hide();
+        screen.interaction().reset();
         active = screen;
-        activationListener = Objects.requireNonNull(listener, "listener");
+        activationListener = listener;
     }
 
-    /** Stops showing any screen. */
+    /** Stops showing any screen; the hidden screen's hover and press state is discarded. */
     public void hide() {
+        if (active != null) {
+            active.interaction().reset();
+        }
         active = null;
         activationListener = activation -> { };
     }

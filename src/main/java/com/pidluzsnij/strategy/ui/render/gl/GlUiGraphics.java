@@ -16,6 +16,11 @@ import java.nio.FloatBuffer;
 import java.util.Objects;
 
 import static org.lwjgl.opengl.GL11.GL_BLEND;
+import static org.lwjgl.opengl.GL11.GL_BLEND_DST;
+import static org.lwjgl.opengl.GL11.GL_BLEND_SRC;
+import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
+import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11.GL_FLOAT;
 import static org.lwjgl.opengl.GL11.GL_LINEAR;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
@@ -127,6 +132,10 @@ public final class GlUiGraphics implements UiGraphics {
     private FloatBuffer vertices;
 
     private boolean drawing;
+    /** OpenGL state changed by a frame and restored when it ends. */
+    private final int[] savedViewport = new int[4];
+    private int savedBlendSource;
+    private int savedBlendDestination;
     private boolean blendWasEnabled;
     private boolean scissorWasEnabled;
     private int batchTexture;
@@ -229,9 +238,14 @@ public final class GlUiGraphics implements UiGraphics {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            int previousAlignment = glGetInteger(GL_UNPACK_ALIGNMENT);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            try {
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+            } finally {
+                glPixelStorei(GL_UNPACK_ALIGNMENT, previousAlignment);
+                glBindTexture(GL_TEXTURE_2D, 0);
+            }
             return texture;
         } finally {
             MemoryUtil.memFree(pixels);
@@ -247,6 +261,9 @@ public final class GlUiGraphics implements UiGraphics {
         batchTexture = 0;
         batchQuads = 0;
         vertices.clear();
+        glGetIntegerv(GL_VIEWPORT, savedViewport);
+        savedBlendSource = glGetInteger(GL_BLEND_SRC);
+        savedBlendDestination = glGetInteger(GL_BLEND_DST);
         glViewport(0, 0, framebufferWidth, framebufferHeight);
         blendWasEnabled = glIsEnabled(GL_BLEND);
         scissorWasEnabled = glIsEnabled(GL_SCISSOR_TEST);
@@ -340,9 +357,11 @@ public final class GlUiGraphics implements UiGraphics {
             glBindBuffer(GL_ARRAY_BUFFER, 0);
             glBindTexture(GL_TEXTURE_2D, 0);
             glUseProgram(0);
+            glBlendFunc(savedBlendSource, savedBlendDestination);
             if (!blendWasEnabled) {
                 glDisable(GL_BLEND);
             }
+            glViewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
             if (!scissorWasEnabled) {
                 glDisable(GL_SCISSOR_TEST);
             }

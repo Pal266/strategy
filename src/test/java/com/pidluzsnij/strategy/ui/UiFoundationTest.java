@@ -354,6 +354,30 @@ class UiFoundationTest {
     }
 
     @Test
+    void showingOrHidingDiscardsAPressInProgress() throws Exception {
+        UiFoundation ui = initialize(List.of("screens/main.json"));
+        UiScreen screen = ui.requiredScreen(path("screens/main.json")).orElseThrow();
+        List<UiActivation> activations = new ArrayList<>();
+        ui.show(screen, activations::add);
+        PointerListener pointer = ui.pointerListener();
+
+        pointer.primaryButton(true, 700, 450, 1600, 900);
+        assertEquals(VisualState.PRESSED, screen.state("start"));
+        ui.hide();
+        assertEquals(VisualState.NORMAL, screen.state("start"));
+        ui.show(screen, activations::add);
+        assertEquals(VisualState.NORMAL, screen.state("start"));
+        pointer.primaryButton(false, 700, 450, 1600, 900);
+        assertEquals(List.of(), activations, "the press began before the screen was shown");
+
+        pointer.primaryButton(true, 700, 450, 1600, 900);
+        ui.show(screen, activations::add);
+        pointer.primaryButton(false, 700, 450, 1600, 900);
+        assertEquals(List.of(), activations, "showing again also discards the press");
+        ui.close();
+    }
+
+    @Test
     void pointerInTheUnusedFramebufferAreaDoesNotInteract() throws Exception {
         UiFixtures.ResourceSet set = bundledSet().put("screens/edge.json", definition(1600, 900,
                 button("edge", -100, 0, 300, 900, "test.start", "images/normal.png", "images/hovered.png",

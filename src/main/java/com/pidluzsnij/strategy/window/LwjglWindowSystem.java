@@ -7,6 +7,7 @@ import org.lwjgl.glfw.Callbacks;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.system.Callback;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.Platform;
@@ -70,6 +71,7 @@ public final class LwjglWindowSystem implements WindowSystem {
     private VideoMode monitorVideoMode;
     private long window = NULL;
     private PointerListener pointerListener = PointerListener.NONE;
+    private boolean pointerCallbacksInstalled;
 
     @Override
     public void initialize(GlfwErrorListener errorListener) {
@@ -176,22 +178,34 @@ public final class LwjglWindowSystem implements WindowSystem {
             throw new IllegalStateException("the window has not been created");
         }
         pointerListener = listener == null ? PointerListener.NONE : listener;
-        glfwSetCursorPosCallback(window, (handle, x, y) -> {
+        if (pointerCallbacksInstalled) {
+            // The callbacks read the current listener, so replacing the listener is enough.
+            return;
+        }
+        freeCallback(glfwSetCursorPosCallback(window, (handle, x, y) -> {
             double[] point = toFramebuffer(x, y);
             pointerListener.pointerMoved(point[0], point[1], (int) point[2], (int) point[3]);
-        });
-        glfwSetMouseButtonCallback(window, (handle, button, action, mods) -> {
+        }));
+        freeCallback(glfwSetMouseButtonCallback(window, (handle, button, action, mods) -> {
             if (button != GLFW_MOUSE_BUTTON_LEFT || (action != GLFW_PRESS && action != GLFW_RELEASE)) {
                 return;
             }
             double[] point = cursorInFramebuffer();
             pointerListener.primaryButton(action == GLFW_PRESS, point[0], point[1], (int) point[2], (int) point[3]);
-        });
-        glfwSetCursorEnterCallback(window, (handle, entered) -> {
+        }));
+        freeCallback(glfwSetCursorEnterCallback(window, (handle, entered) -> {
             if (!entered) {
                 pointerListener.pointerLeft();
             }
-        });
+        }));
+        pointerCallbacksInstalled = true;
+    }
+
+    /** Frees a callback that a {@code glfwSet*Callback} call replaced. */
+    private static void freeCallback(Callback previous) {
+        if (previous != null) {
+            previous.free();
+        }
     }
 
     private double[] cursorInFramebuffer() {
@@ -252,6 +266,7 @@ public final class LwjglWindowSystem implements WindowSystem {
         long handle = window;
         window = NULL;
         pointerListener = PointerListener.NONE;
+        pointerCallbacksInstalled = false;
         glfwMakeContextCurrent(NULL);
         GL.setCapabilities(null);
         Callbacks.glfwFreeCallbacks(handle);

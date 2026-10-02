@@ -67,6 +67,13 @@ public final class UiInteraction {
         hovered = null;
     }
 
+    /** Forgets the pointer position and any press in progress, as when the UI is shown or hidden. */
+    public void reset() {
+        hovered = null;
+        held = false;
+        captured = null;
+    }
+
     /** @return the activation produced by this event, if any */
     public Optional<UiActivation> primaryButton(boolean pressed, double x, double y,
                                                 int framebufferWidth, int framebufferHeight) {

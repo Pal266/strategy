@@ -3,6 +3,7 @@ package com.pidluzsnij.strategy.ui.render;
 import com.pidluzsnij.strategy.testsupport.UiFixtures;
 import com.pidluzsnij.strategy.ui.asset.GlyphAtlas;
 import com.pidluzsnij.strategy.ui.asset.UiFont;
+import com.pidluzsnij.strategy.ui.asset.UiImage;
 import com.pidluzsnij.strategy.ui.asset.UiImageDecoder;
 import com.pidluzsnij.strategy.ui.definition.TextAlign;
 import com.pidluzsnij.strategy.ui.definition.UiColor;
@@ -19,8 +20,10 @@ import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
@@ -33,14 +36,28 @@ import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
 import static org.lwjgl.glfw.GLFW.glfwSetErrorCallback;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
 import static org.lwjgl.glfw.GLFW.glfwWindowHint;
+import static org.lwjgl.opengl.GL11.GL_BLEND;
+import static org.lwjgl.opengl.GL11.GL_BLEND_DST;
+import static org.lwjgl.opengl.GL11.GL_BLEND_SRC;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.GL_NO_ERROR;
+import static org.lwjgl.opengl.GL11.GL_ONE;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
+import static org.lwjgl.opengl.GL11.GL_SCISSOR_TEST;
+import static org.lwjgl.opengl.GL11.GL_UNPACK_ALIGNMENT;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
+import static org.lwjgl.opengl.GL11.GL_ZERO;
+import static org.lwjgl.opengl.GL11.glBlendFunc;
 import static org.lwjgl.opengl.GL11.glClear;
 import static org.lwjgl.opengl.GL11.glClearColor;
 import static org.lwjgl.opengl.GL11.glGetError;
+import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
+import static org.lwjgl.opengl.GL11.glIsEnabled;
+import static org.lwjgl.opengl.GL11.glPixelStorei;
 import static org.lwjgl.opengl.GL11.glReadPixels;
+import static org.lwjgl.opengl.GL11.glViewport;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 /**
@@ -149,6 +166,37 @@ class GlUiGraphicsTest {
             graphics.close();
         }
         assertEquals(GL_NO_ERROR, glGetError());
+    }
+
+    @Test
+    void frameAndUploadRestoreTheOpenGlStateTheyChange() {
+        GlUiGraphics graphics = new GlUiGraphics();
+        try {
+            graphics.initialize();
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
+            glViewport(3, 4, 50, 60);
+            glBlendFunc(GL_ONE, GL_ZERO);
+
+            UiTexture texture = graphics.createTexture("t", new UiImage(3, 1, new byte[12]));
+            graphics.beginFrame(SIZE, SIZE, new ScreenRect(0, 0, SIZE, SIZE));
+            graphics.drawImage(texture, new ScreenRect(0, 0, 10, 10));
+            graphics.endFrame();
+            texture.close();
+
+            assertEquals(8, glGetInteger(GL_UNPACK_ALIGNMENT));
+            int[] viewport = new int[4];
+            glGetIntegerv(GL_VIEWPORT, viewport);
+            assertEquals(List.of(3, 4, 50, 60), List.of(viewport[0], viewport[1], viewport[2], viewport[3]));
+            assertEquals(GL_ONE, glGetInteger(GL_BLEND_SRC));
+            assertEquals(GL_ZERO, glGetInteger(GL_BLEND_DST));
+            assertFalse(glIsEnabled(GL_BLEND));
+            assertFalse(glIsEnabled(GL_SCISSOR_TEST));
+            assertEquals(GL_NO_ERROR, glGetError());
+        } finally {
+            graphics.close();
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+            glViewport(0, 0, SIZE, SIZE);
+        }
     }
 
     @Test
