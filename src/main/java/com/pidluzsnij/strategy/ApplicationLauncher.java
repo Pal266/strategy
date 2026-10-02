@@ -16,6 +16,7 @@ import com.pidluzsnij.strategy.logging.LogLocation;
 import com.pidluzsnij.strategy.logging.LoggingInitializationException;
 import com.pidluzsnij.strategy.logging.LoggingMode;
 import com.pidluzsnij.strategy.logging.LoggingSystem;
+import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
 import com.pidluzsnij.strategy.window.Application;
 import com.pidluzsnij.strategy.window.LwjglWindowSystem;
 import com.pidluzsnij.strategy.window.RuntimeEnvironment;
@@ -25,12 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
  * Starts the application: diagnostic logging first, then configuration, then localization, then all
- * other infrastructure, and closes logging last.
+ * other infrastructure (window, OpenGL and the UI foundation), and closes logging last.
  */
 public final class ApplicationLauncher {
 
@@ -56,7 +58,9 @@ public final class ApplicationLauncher {
     private final LocalizationResources localizationResources;
     private final Supplier<WindowSystem> windowSystemFactory;
     private final Supplier<RuntimeEnvironment> runtimeFactory;
+    private final UiStartupConfiguration uiConfiguration;
 
+    /** A launcher whose UI foundation uses the production UI configuration at {@code configurationLocation}. */
     public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,
                                PrintStream stderr, SettingsSchema settingsSchema,
                                ConfigurationLocation configurationLocation,
@@ -64,6 +68,19 @@ public final class ApplicationLauncher {
                                LocalizationResources localizationResources,
                                Supplier<WindowSystem> windowSystemFactory,
                                Supplier<RuntimeEnvironment> runtimeFactory) {
+        this(mode, logLocation, fileOperations, stderr, settingsSchema, configurationLocation, persistenceFactory,
+                localizationResources, windowSystemFactory, runtimeFactory,
+                UiStartupConfiguration.production(configurationLocation));
+    }
+
+    public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,
+                               PrintStream stderr, SettingsSchema settingsSchema,
+                               ConfigurationLocation configurationLocation,
+                               ConfigurationPersistenceFactory persistenceFactory,
+                               LocalizationResources localizationResources,
+                               Supplier<WindowSystem> windowSystemFactory,
+                               Supplier<RuntimeEnvironment> runtimeFactory,
+                               UiStartupConfiguration uiConfiguration) {
         if (!settingsSchema.contains(LocalizationSettings.LANGUAGE)) {
             throw new IllegalArgumentException("the settings schema must contain the localization language setting");
         }
@@ -77,6 +94,7 @@ public final class ApplicationLauncher {
         this.localizationResources = localizationResources;
         this.windowSystemFactory = windowSystemFactory;
         this.runtimeFactory = runtimeFactory;
+        this.uiConfiguration = Objects.requireNonNull(uiConfiguration, "uiConfiguration");
     }
 
     /** The launcher used by normal application startup. */
@@ -90,6 +108,11 @@ public final class ApplicationLauncher {
     /** @return the settings recognized by this launcher's configuration */
     public SettingsSchema settingsSchema() {
         return settingsSchema;
+    }
+
+    /** @return the UI-foundation configuration this launcher uses */
+    public UiStartupConfiguration uiConfiguration() {
+        return uiConfiguration;
     }
 
     /** @return the logging mode this launcher initializes */
@@ -123,7 +146,7 @@ public final class ApplicationLauncher {
             Application application;
             try {
                 application = new Application(windowSystemFactory.get(), runtimeFactory.get(), settings.get(),
-                        localization.get());
+                        localization.get(), uiConfiguration);
             } catch (RuntimeException | LinkageError e) {
                 log.error("Application infrastructure could not be created", e);
                 return Application.EXIT_FAILURE;

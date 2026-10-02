@@ -1,9 +1,13 @@
 package com.pidluzsnij.strategy.window;
 
+import com.pidluzsnij.strategy.ui.input.PointerListener;
+import com.pidluzsnij.strategy.ui.render.UiGraphics;
+import com.pidluzsnij.strategy.ui.render.gl.GlUiGraphics;
 import org.lwjgl.glfw.Callbacks;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.system.Callback;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.Platform;
@@ -19,6 +23,11 @@ import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
 import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
 import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
 import static org.lwjgl.glfw.GLFW.glfwDestroyWindow;
+import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
+import static org.lwjgl.glfw.GLFW.GLFW_PRESS;
+import static org.lwjgl.glfw.GLFW.GLFW_RELEASE;
+import static org.lwjgl.glfw.GLFW.glfwGetCursorPos;
+import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
 import static org.lwjgl.glfw.GLFW.glfwGetMonitorName;
 import static org.lwjgl.glfw.GLFW.glfwGetPrimaryMonitor;
 import static org.lwjgl.glfw.GLFW.glfwGetVideoMode;
@@ -28,7 +37,10 @@ import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
 import static org.lwjgl.glfw.GLFW.glfwInit;
 import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
 import static org.lwjgl.glfw.GLFW.glfwPollEvents;
+import static org.lwjgl.glfw.GLFW.glfwSetCursorEnterCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetCursorPosCallback;
 import static org.lwjgl.glfw.GLFW.glfwSetErrorCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback;
 import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
 import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
@@ -58,6 +70,8 @@ public final class LwjglWindowSystem implements WindowSystem {
     private long monitor = NULL;
     private VideoMode monitorVideoMode;
     private long window = NULL;
+    private PointerListener pointerListener = PointerListener.NONE;
+    private boolean pointerCallbacksInstalled;
 
     @Override
     public void initialize(GlfwErrorListener errorListener) {
@@ -129,10 +143,93 @@ public final class LwjglWindowSystem implements WindowSystem {
     }
 
     @Override
-    public void renderBlackFrame() {
+    public void renderFrame(FrameOverlay overlay) {
         glClearColor(0f, 0f, 0f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
+        if (overlay != FrameOverlay.NONE) {
+            Resolution framebuffer = framebufferSize();
+            overlay.draw(framebuffer.width(), framebuffer.height());
+        }
         glfwSwapBuffers(window);
+    }
+
+    @Override
+    public Resolution framebufferSize() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer width = stack.mallocInt(1);
+            IntBuffer height = stack.mallocInt(1);
+            glfwGetFramebufferSize(window, width, height);
+            return new Resolution(width.get(0), height.get(0));
+        }
+    }
+
+    @Override
+    public UiGraphics createUiGraphics() {
+        return new GlUiGraphics();
+    }
+
+    /**
+     * Installs GLFW cursor and mouse-button callbacks; they are freed with the window. Cursor positions are
+     * converted from window coordinates to framebuffer pixels.
+     */
+    @Override
+    public void setPointerListener(PointerListener listener) {
+        if (window == NULL) {
+            throw new IllegalStateException("the window has not been created");
+        }
+        pointerListener = listener == null ? PointerListener.NONE : listener;
+        if (pointerCallbacksInstalled) {
+            // The callbacks read the current listener, so replacing the listener is enough.
+            return;
+        }
+        freeCallback(glfwSetCursorPosCallback(window, (handle, x, y) -> {
+            double[] point = toFramebuffer(x, y);
+            pointerListener.pointerMoved(point[0], point[1], (int) point[2], (int) point[3]);
+        }));
+        freeCallback(glfwSetMouseButtonCallback(window, (handle, button, action, mods) -> {
+            if (button != GLFW_MOUSE_BUTTON_LEFT || (action != GLFW_PRESS && action != GLFW_RELEASE)) {
+                return;
+            }
+            double[] point = cursorInFramebuffer();
+            pointerListener.primaryButton(action == GLFW_PRESS, point[0], point[1], (int) point[2], (int) point[3]);
+        }));
+        freeCallback(glfwSetCursorEnterCallback(window, (handle, entered) -> {
+            if (!entered) {
+                pointerListener.pointerLeft();
+            }
+        }));
+        pointerCallbacksInstalled = true;
+    }
+
+    /** Frees a callback that a {@code glfwSet*Callback} call replaced. */
+    private static void freeCallback(Callback previous) {
+        if (previous != null) {
+            previous.free();
+        }
+    }
+
+    private double[] cursorInFramebuffer() {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            java.nio.DoubleBuffer x = stack.mallocDouble(1);
+            java.nio.DoubleBuffer y = stack.mallocDouble(1);
+            glfwGetCursorPos(window, x, y);
+            return toFramebuffer(x.get(0), y.get(0));
+        }
+    }
+
+    /** @return {x, y, framebuffer width, framebuffer height} for a cursor position in window coordinates */
+    private double[] toFramebuffer(double x, double y) {
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            IntBuffer windowWidth = stack.mallocInt(1);
+            IntBuffer windowHeight = stack.mallocInt(1);
+            IntBuffer framebufferWidth = stack.mallocInt(1);
+            IntBuffer framebufferHeight = stack.mallocInt(1);
+            glfwGetWindowSize(window, windowWidth, windowHeight);
+            glfwGetFramebufferSize(window, framebufferWidth, framebufferHeight);
+            double scaleX = windowWidth.get(0) > 0 ? (double) framebufferWidth.get(0) / windowWidth.get(0) : 1.0;
+            double scaleY = windowHeight.get(0) > 0 ? (double) framebufferHeight.get(0) / windowHeight.get(0) : 1.0;
+            return new double[] {x * scaleX, y * scaleY, framebufferWidth.get(0), framebufferHeight.get(0)};
+        }
     }
 
     @Override
@@ -168,6 +265,8 @@ public final class LwjglWindowSystem implements WindowSystem {
         }
         long handle = window;
         window = NULL;
+        pointerListener = PointerListener.NONE;
+        pointerCallbacksInstalled = false;
         glfwMakeContextCurrent(NULL);
         GL.setCapabilities(null);
         Callbacks.glfwFreeCallbacks(handle);

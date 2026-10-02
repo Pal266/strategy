@@ -44,10 +44,11 @@ class ApplicationLoggingTest {
         return records.stream().filter(r -> r.contains(" " + level + " [")).toList();
     }
 
-    /** Records other than the configuration and localization events, which have their own tests. */
+    /** Records other than the configuration, localization and UI-foundation events, which have their own tests. */
     private static List<String> withoutConfiguration(List<String> records) {
         return records.stream().filter(r -> !r.contains("] com.pidluzsnij.strategy.ConfigurationStartup - ")
-                && !r.contains("] com.pidluzsnij.strategy.localization.")).toList();
+                && !r.contains("] com.pidluzsnij.strategy.localization.")
+                && !r.contains("] com.pidluzsnij.strategy.ui.")).toList();
     }
 
     private static boolean has(List<String> records, String level, String text) {

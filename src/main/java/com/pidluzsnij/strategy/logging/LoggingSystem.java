@@ -3,6 +3,7 @@ package com.pidluzsnij.strategy.logging;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import com.pidluzsnij.strategy.paths.ApplicationDirectory;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +24,7 @@ import static com.pidluzsnij.strategy.logging.LoggingInitializationException.Rea
  */
 public final class LoggingSystem implements AutoCloseable {
 
-    public static final String DIRECTORY_NAME = "strategy";
+    public static final String DIRECTORY_NAME = ApplicationDirectory.NAME;
     public static final String FILE_NAME = "log.log";
 
     /** Timestamp with timezone, level, thread, logger, message, then any exception with stack trace. */

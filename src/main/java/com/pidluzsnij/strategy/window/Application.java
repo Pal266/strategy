@@ -4,14 +4,18 @@ import com.pidluzsnij.strategy.config.ApplicationSettings;
 import com.pidluzsnij.strategy.config.VideoResolution;
 import com.pidluzsnij.strategy.config.VideoSettings;
 import com.pidluzsnij.strategy.localization.Localization;
+import com.pidluzsnij.strategy.ui.UiException;
+import com.pidluzsnij.strategy.ui.UiFoundation;
+import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 
 /**
- * Runs the window lifecycle: initialization, black-screen presentation until a close
- * request, and cleanup. Each failure is logged once, here.
+ * Runs the window lifecycle: initialization (GLFW, window, OpenGL, then the UI foundation), black-screen
+ * presentation until a close request, and cleanup. Each failure is logged once: window failures here, UI
+ * foundation initialization failures by the UI foundation.
  */
 public final class Application {
 
@@ -29,10 +33,14 @@ public final class Application {
     private final VideoResolution configuredResolution;
     private final ApplicationSettings applicationSettings;
     private final Localization localization;
+    private final UiStartupConfiguration uiConfiguration;
+    private UiFoundation ui;
 
     public Application(WindowSystem windowSystem, RuntimeEnvironment runtime,
-                       ApplicationSettings applicationSettings, Localization localization) {
+                       ApplicationSettings applicationSettings, Localization localization,
+                       UiStartupConfiguration uiConfiguration) {
         this.windowSystem = windowSystem;
+        this.uiConfiguration = Objects.requireNonNull(uiConfiguration, "uiConfiguration");
         this.runtime = runtime;
         this.localization = Objects.requireNonNull(localization, "localization");
         // The title is resolved once, after localization succeeded and before the window is created.
@@ -89,12 +97,27 @@ public final class Application {
                 settings.title(), state.resolution(), state.fullscreen());
 
         try {
+            Resolution framebuffer = windowSystem.framebufferSize();
+            ui = UiFoundation.initialize(uiConfiguration, windowSystem.createUiGraphics(), localization,
+                    framebuffer.width(), framebuffer.height());
+            windowSystem.setPointerListener(ui.pointerListener());
+        } catch (UiException e) {
+            // Already logged by the UI foundation, which also released what it had allocated.
+            cleanUp();
+            return EXIT_FAILURE;
+        } catch (RuntimeException | LinkageError e) {
+            return failStartup("UI initialization", e);
+        }
+
+        UiFoundation frameUi = ui;
+        FrameOverlay overlay = frameUi::render;
+        try {
             while (true) {
                 windowSystem.processEvents();
                 if (windowSystem.isCloseRequested()) {
                     break;
                 }
-                windowSystem.renderBlackFrame();
+                windowSystem.renderFrame(overlay);
             }
         } catch (RuntimeException e) {
             log.error("Window event processing or rendering failed", e);
@@ -152,9 +175,15 @@ public final class Application {
 
     /** @return whether every cleanup operation succeeded */
     private boolean cleanUp() {
+        boolean uiReleased = true;
+        if (ui != null) {
+            UiFoundation released = ui;
+            ui = null;
+            uiReleased = cleanUpStep("release UI resources", released::close);
+        }
         boolean destroyed = cleanUpStep("destroy window", windowSystem::destroyWindow);
         boolean terminated = cleanUpStep("terminate GLFW", windowSystem::terminate);
-        if (destroyed && terminated) {
+        if (uiReleased && destroyed && terminated) {
             log.debug("Window and graphics resources released");
             return true;
         }

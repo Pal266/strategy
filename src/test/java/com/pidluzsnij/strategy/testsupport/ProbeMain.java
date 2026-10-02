@@ -37,6 +37,11 @@ import java.util.stream.Collectors;
  * <p>
  * {@code ProbeMain localize <resourceRoot> <language> <key>} initializes localization alone from the
  * {@code localization} folder of an isolated class path consisting only of {@code resourceRoot}.
+ * <p>
+ * {@code ProbeMain uiresolve <bundledRoot> <configDir> <path>...} resolves UI resources with the production
+ * UI configuration shape: bundled resources from the {@code ui} folder of an isolated class path consisting
+ * only of {@code bundledRoot} (a directory or archive), overrides from {@code configDir/strategy/ui}. It prints
+ * {@code RESOLVED <path> <origin> <sha256>} per path.
  */
 public final class ProbeMain {
 
@@ -46,6 +51,10 @@ public final class ProbeMain {
     public static void main(String[] args) throws Exception {
         if (args[0].equals("location")) {
             System.out.println("LOCATION " + new DirectoriesLogLocation().configDirectory());
+            return;
+        }
+        if (args[0].equals("uiresolve")) {
+            uiResolve(Path.of(args[1]), Path.of(args[2]), java.util.Arrays.copyOfRange(args, 3, args.length));
             return;
         }
         if (args[0].equals("localize")) {
@@ -93,6 +102,24 @@ public final class ProbeMain {
     private static LocalizationResources isolatedResources(Path root) throws Exception {
         return new ClasspathLocalizationResources(
                 new URLClassLoader(new URL[] {root.toUri().toURL()}, ClassLoader.getPlatformClassLoader()));
+    }
+
+    private static void uiResolve(Path bundledRoot, Path configDirectory, String[] paths) throws Exception {
+        try (URLClassLoader loader = new URLClassLoader(new URL[] {bundledRoot.toUri().toURL()},
+                ClassLoader.getPlatformClassLoader())) {
+            com.pidluzsnij.strategy.ui.UiStartupConfiguration configuration =
+                    com.pidluzsnij.strategy.ui.UiStartupConfiguration.production(() -> configDirectory);
+            com.pidluzsnij.strategy.ui.resource.UiResources resources =
+                    new com.pidluzsnij.strategy.ui.resource.UiResources(loader,
+                            com.pidluzsnij.strategy.ui.resource.UiResources.externalRoot(
+                                    configuration.location().configDirectory()));
+            for (String path : paths) {
+                com.pidluzsnij.strategy.ui.resource.ResolvedUiResource resource =
+                        resources.resolve(com.pidluzsnij.strategy.ui.resource.UiResourcePath.of(path));
+                System.out.println("RESOLVED " + path + " " + resource.origin() + " " + UiFixtures.sha256(resource.bytes()));
+            }
+        }
+        System.out.flush();
     }
 
     private static void localize(Path root, String language, String key) throws Exception {

@@ -10,6 +10,7 @@ import com.pidluzsnij.strategy.localization.LocalizationResources;
 import com.pidluzsnij.strategy.logging.FileOperations;
 import com.pidluzsnij.strategy.logging.LogLocation;
 import com.pidluzsnij.strategy.logging.LoggingMode;
+import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
 import com.pidluzsnij.strategy.window.RuntimeEnvironment;
 import com.pidluzsnij.strategy.window.WindowSystem;
 
@@ -55,6 +56,8 @@ public final class LogHarness {
     public ConfigurationLocation configurationLocation;
     /** Localization resources; by default the application's bundled, read-only resources. */
     public LocalizationResources localizationResources = LocalizationResources.bundled();
+    /** UI-foundation configuration; by default the production configuration at {@link #configurationLocation}. */
+    public UiStartupConfiguration uiConfiguration;
 
     public LogHarness(Path tempDirectory) {
         this.configDirectory = tempDirectory.resolve("config");
@@ -90,7 +93,9 @@ public final class LogHarness {
         StorageOperations configurationStorage = storage;
         return new ApplicationLauncher(mode, location, fileOperations, stderr, settingsSchema, configurationLocation,
                 (schema, directory) -> new TomlConfigurationPersistence(schema, directory, configurationStorage),
-                localizationResources, factory, runtime).launch();
+                localizationResources, factory, runtime,
+                uiConfiguration != null ? uiConfiguration : UiStartupConfiguration.production(configurationLocation))
+                .launch();
     }
 
     public String stderr() {
