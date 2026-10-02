@@ -303,6 +303,32 @@ class UiStartupTest {
         assertTrue(harness.log().contains("UI resource 'images/h.png' resolved from external override"));
     }
 
+    @Test
+    void fontWithoutGlyphsForTheLocalizedTextIsReportedOnceWithoutTheText() {
+        prepare(resources());
+        // The euro sign and the CJK character are not in the test font; the other characters are.
+        String uncovered = TITLE + " € 字 €";
+        harness.localizationResources = new com.pidluzsnij.strategy.testsupport.FixtureResources()
+                .put("english.properties", "application.window.title=Test window\ntest.ui.title=" + uncovered + "\n");
+
+        assertEquals(0, launch(LoggingMode.DEFAULT), "missing glyphs are not fatal");
+
+        List<String> warnings = withLevel("WARN ");
+        assertEquals(1, warnings.size(), harness.records().toString());
+        long distinct = uncovered.codePoints().distinct().count();
+        assertTrue(warnings.get(0).contains("UI font bundled fonts/a.ttf has no glyph for 2 of the " + distinct
+                + " distinct character(s) of its localized text (language 'en')"), warnings.get(0));
+        assertFalse(harness.log().contains("€"), "the characters are not logged");
+        assertFalse(harness.log().contains(TITLE), "the text is not logged");
+    }
+
+    @Test
+    void fontCoveringTheLocalizedTextProducesNoWarning() {
+        prepare(resources());
+        assertEquals(0, launch(LoggingMode.DEFAULT));
+        assertTrue(withLevel("WARN ").isEmpty(), harness.records().toString());
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {3, 300})
     void framesAndPointerInputProduceNoUiRecords(int frames) {

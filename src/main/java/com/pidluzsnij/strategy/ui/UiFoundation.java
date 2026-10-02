@@ -229,6 +229,7 @@ public final class UiFoundation implements AutoCloseable {
                 text.codePoints().forEach(set::add);
             }
 
+            Map<UiFont, Set<Integer>> used = new LinkedHashMap<>();
             for (UiScreen.FaceKey key : codePoints.keySet()) {
                 if (!fonts.containsKey(key.font())) {
                     ResolvedUiResource resource = resolve(key.font(), progress);
@@ -236,6 +237,7 @@ public final class UiFoundation implements AutoCloseable {
                     fonts.put(key.font(), UiFont.load(resource));
                 }
                 UiFont font = fonts.get(key.font());
+                used.computeIfAbsent(font, f -> new LinkedHashSet<>()).addAll(codePoints.get(key));
                 progress.enter(STAGE_RASTERIZE, font.name());
                 GlyphAtlas atlas = font.rasterize(key.pixelHeight(),
                         codePoints.get(key).stream().mapToInt(Integer::intValue).toArray());
@@ -245,6 +247,7 @@ public final class UiFoundation implements AutoCloseable {
 
             UiScreen screen = new UiScreen(definition, textures, fonts, faces, texts, textFaces);
             screens.add(screen);
+            used.forEach(this::warnAboutMissingGlyphs);
             return screen;
         } catch (UiException | RuntimeException | LinkageError e) {
             List<Throwable> failures = new ArrayList<>();
@@ -253,6 +256,19 @@ public final class UiFoundation implements AutoCloseable {
             fonts.values().forEach(f -> UiScreen.releaseOne(f::close, failures));
             failures.forEach(e::addSuppressed);
             throw e;
+        }
+    }
+
+    /**
+     * Warns once per font of a loaded definition when the font maps no glyph for some characters of the
+     * localized text drawn with it. Only counts are logged, never the text or the characters.
+     */
+    private void warnAboutMissingGlyphs(UiFont font, Set<Integer> codePoints) {
+        long missing = codePoints.stream().filter(codePoint -> !font.hasGlyph(codePoint)).count();
+        if (missing > 0) {
+            log.warn("UI font {} has no glyph for {} of the {} distinct character(s) of its localized text "
+                            + "(language '{}'); those characters are drawn with the font's missing-glyph shape",
+                    font.name(), missing, codePoints.size(), localization.effectiveLanguage());
         }
     }
 
