@@ -16,6 +16,7 @@ import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistenceExcept
 import com.pidluzsnij.strategy.config.persistence.ConfigurationPersistenceException.Operation;
 import com.pidluzsnij.strategy.config.persistence.LoadResult;
 import com.pidluzsnij.strategy.config.persistence.StorageOperations;
+import com.pidluzsnij.strategy.paths.ApplicationDirectory;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -37,7 +38,7 @@ import java.util.function.Function;
  */
 public final class TomlConfigurationPersistence implements ConfigurationPersistence {
 
-    public static final String DIRECTORY_NAME = "strategy";
+    public static final String DIRECTORY_NAME = ApplicationDirectory.NAME;
     public static final String FILE_NAME = "application-settings.toml";
 
     private static final String TEMP_PREFIX = FILE_NAME + ".";

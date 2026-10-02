@@ -100,19 +100,19 @@ public final class UiDefinitionParser {
             throw new UiException(STAGE, resource.name(), "UI definitions must be " + DEFINITION_EXTENSION + " resources");
         }
         try {
-            String text = decode(resource.bytes());
+            String text = decode(resource.buffer());
             return definition(resource.path(), JsonReader.read(text));
         } catch (MalformedDefinitionException e) {
             throw new UiException(STAGE, resource.name(), e.getMessage());
         }
     }
 
-    private static String decode(byte[] bytes) throws MalformedDefinitionException {
+    private static String decode(ByteBuffer bytes) throws MalformedDefinitionException {
         try {
             String text = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes))
+                    .decode(bytes)
                     .toString();
             return text.startsWith("﻿") ? text.substring(1) : text;
         } catch (CharacterCodingException e) {

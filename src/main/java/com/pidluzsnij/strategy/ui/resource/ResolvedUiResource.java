@@ -1,5 +1,6 @@
 package com.pidluzsnij.strategy.ui.resource;
 
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /** The bytes of a resolved UI resource and where they came from. */
@@ -26,6 +27,16 @@ public final class ResolvedUiResource {
     /** @return a copy of the resource's complete contents */
     public byte[] bytes() {
         return bytes.clone();
+    }
+
+    /** @return a read-only view of the resource's complete contents, without copying */
+    public ByteBuffer buffer() {
+        return ByteBuffer.wrap(bytes).asReadOnlyBuffer();
+    }
+
+    /** @return the size of the resource in bytes */
+    public int size() {
+        return bytes.length;
     }
 
     /** @return the resource name used in diagnostics */

@@ -31,11 +31,11 @@ public final class UiImageDecoder {
 
     /** @throws UiException when the resource is not a decodable PNG image within the size limits */
     public static UiImage decode(ResolvedUiResource resource) throws UiException {
-        byte[] bytes = resource.bytes();
+        ByteBuffer bytes = resource.buffer();
         if (!isPng(bytes)) {
             throw new UiException(STAGE, resource.name(), "the resource is not a PNG image");
         }
-        ByteBuffer encoded = MemoryUtil.memAlloc(bytes.length);
+        ByteBuffer encoded = MemoryUtil.memAlloc(bytes.remaining());
         try (MemoryStack stack = MemoryStack.stackPush()) {
             encoded.put(bytes).flip();
             IntBuffer width = stack.mallocInt(1);
@@ -66,12 +66,12 @@ public final class UiImageDecoder {
     }
 
     /** @return whether {@code bytes} start with the PNG signature */
-    public static boolean isPng(byte[] bytes) {
-        if (bytes.length < PNG_SIGNATURE.length) {
+    static boolean isPng(ByteBuffer bytes) {
+        if (bytes.remaining() < PNG_SIGNATURE.length) {
             return false;
         }
         for (int i = 0; i < PNG_SIGNATURE.length; i++) {
-            if (bytes[i] != PNG_SIGNATURE[i]) {
+            if (bytes.get(bytes.position() + i) != PNG_SIGNATURE[i]) {
                 return false;
             }
         }

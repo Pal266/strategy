@@ -50,12 +50,12 @@ public final class UiFont implements AutoCloseable {
      *                     remains allocated in that case
      */
     public static UiFont load(ResolvedUiResource resource) throws UiException {
-        byte[] bytes = resource.bytes();
+        ByteBuffer bytes = resource.buffer();
         String problem = structuralProblem(bytes);
         if (problem != null) {
             throw new UiException(STAGE, resource.name(), problem);
         }
-        ByteBuffer data = MemoryUtil.memAlloc(bytes.length);
+        ByteBuffer data = MemoryUtil.memAlloc(bytes.remaining());
         STBTTFontinfo info = null;
         boolean loaded = false;
         try {
@@ -81,31 +81,34 @@ public final class UiFont implements AutoCloseable {
      *
      * @return a safe description of the problem, or {@code null} when the structure is acceptable
      */
-    static String structuralProblem(byte[] bytes) {
-        if (bytes.length < 12) {
+    static String structuralProblem(ByteBuffer bytes) {
+        int size = bytes.remaining();
+        if (size < 12) {
             return "the resource is too short to be a TrueType font";
         }
-        int version = readInt(bytes, 0);
+        int version = bytes.getInt(0);
         if (version == 0x74746366) { // 'ttcf'
             return "font collections are not supported";
         }
         if (version != 0x00010000 && version != 0x74727565) { // 1.0 or 'true'
             return "the resource is not a TrueType font";
         }
-        int tables = readUnsignedShort(bytes, 4);
+        int tables = Short.toUnsignedInt(bytes.getShort(4));
         if (tables == 0 || tables > MAX_TABLES) {
             return "the TrueType table directory is malformed";
         }
-        if (12L + tables * 16L > bytes.length) {
+        if (12L + tables * 16L > size) {
             return "the TrueType table directory is truncated";
         }
         List<String> present = new ArrayList<>();
         for (int i = 0; i < tables; i++) {
             int record = 12 + i * 16;
-            String tag = new String(Arrays.copyOfRange(bytes, record, record + 4), java.nio.charset.StandardCharsets.ISO_8859_1);
-            long offset = readInt(bytes, record + 8) & 0xFFFFFFFFL;
-            long length = readInt(bytes, record + 12) & 0xFFFFFFFFL;
-            if (offset + length > bytes.length) {
+            byte[] tagBytes = new byte[4];
+            bytes.get(record, tagBytes);
+            String tag = new String(tagBytes, java.nio.charset.StandardCharsets.ISO_8859_1);
+            long offset = Integer.toUnsignedLong(bytes.getInt(record + 8));
+            long length = Integer.toUnsignedLong(bytes.getInt(record + 12));
+            if (offset + length > size) {
                 return "a TrueType table lies outside the font data";
             }
             present.add(tag);
@@ -116,15 +119,6 @@ public final class UiFont implements AutoCloseable {
             }
         }
         return null;
-    }
-
-    private static int readInt(byte[] bytes, int offset) {
-        return (bytes[offset] & 0xFF) << 24 | (bytes[offset + 1] & 0xFF) << 16
-                | (bytes[offset + 2] & 0xFF) << 8 | (bytes[offset + 3] & 0xFF);
-    }
-
-    private static int readUnsignedShort(byte[] bytes, int offset) {
-        return (bytes[offset] & 0xFF) << 8 | (bytes[offset + 1] & 0xFF);
     }
 
     /** @return the resource name of the font, for diagnostics */

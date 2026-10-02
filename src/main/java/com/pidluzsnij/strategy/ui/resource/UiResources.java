@@ -1,5 +1,6 @@
 package com.pidluzsnij.strategy.ui.resource;
 
+import com.pidluzsnij.strategy.paths.ApplicationDirectory;
 import com.pidluzsnij.strategy.ui.UiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ public final class UiResources {
     public static final String BUNDLED_ROOT = "ui";
 
     /** Name of the application's per-user directory, shared with configuration and logging. */
-    public static final String APPLICATION_DIRECTORY = "strategy";
+    public static final String APPLICATION_DIRECTORY = ApplicationDirectory.NAME;
 
     /** Name of the external override root within the application's per-user directory. */
     public static final String EXTERNAL_DIRECTORY = "ui";
