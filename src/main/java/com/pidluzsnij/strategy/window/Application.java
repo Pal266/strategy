@@ -34,10 +34,11 @@ public final class Application {
                        ApplicationSettings applicationSettings, Localization localization) {
         this.windowSystem = windowSystem;
         this.runtime = runtime;
-        this.settings = WindowSettings.from(applicationSettings);
+        this.localization = Objects.requireNonNull(localization, "localization");
+        // The title is resolved once, after localization succeeded and before the window is created.
+        this.settings = WindowSettings.from(applicationSettings, this.localization);
         this.configuredResolution = applicationSettings.get(VideoSettings.RESOLUTION);
         this.applicationSettings = applicationSettings;
-        this.localization = Objects.requireNonNull(localization, "localization");
     }
 
     /** @return the localization initialized for this application run */
