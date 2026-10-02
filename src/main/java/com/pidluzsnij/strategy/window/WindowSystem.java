@@ -1,5 +1,8 @@
 package com.pidluzsnij.strategy.window;
 
+import com.pidluzsnij.strategy.ui.input.PointerListener;
+import com.pidluzsnij.strategy.ui.render.UiGraphics;
+
 /**
  * Windowing and graphics backend. Methods are called from the main thread in the
  * order used by {@link Application}.
@@ -19,7 +22,21 @@ public interface WindowSystem {
     GraphicsInfo initializeGraphics();
 
     /** Clears the window to black and presents it. */
-    void renderBlackFrame();
+    default void renderBlackFrame() {
+        renderFrame(FrameOverlay.NONE);
+    }
+
+    /** Clears the window to black, lets {@code overlay} draw over it, and presents it. */
+    void renderFrame(FrameOverlay overlay);
+
+    /** @return the current framebuffer size in pixels */
+    Resolution framebufferSize();
+
+    /** @return the UI drawing backend for the window's graphics context; the context must be current */
+    UiGraphics createUiGraphics();
+
+    /** Delivers the window's pointer input to {@code listener} during {@link #processEvents()}. */
+    void setPointerListener(PointerListener listener);
 
     /** Processes pending window-system events. */
     void processEvents();

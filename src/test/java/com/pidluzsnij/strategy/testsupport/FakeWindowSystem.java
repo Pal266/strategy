@@ -1,5 +1,8 @@
 package com.pidluzsnij.strategy.testsupport;
 
+import com.pidluzsnij.strategy.ui.input.PointerListener;
+import com.pidluzsnij.strategy.ui.render.UiGraphics;
+import com.pidluzsnij.strategy.window.FrameOverlay;
 import com.pidluzsnij.strategy.window.GlfwErrorListener;
 import com.pidluzsnij.strategy.window.GraphicsInfo;
 import com.pidluzsnij.strategy.window.MonitorInfo;
@@ -38,6 +41,16 @@ public final class FakeWindowSystem implements WindowSystem {
     /** State reported by the platform after creation; by default the requested settings and resolution. */
     public WindowState actualState;
 
+    /** UI drawing backend handed to the UI foundation. */
+    public RecordingUiGraphics uiGraphics;
+    /** Framebuffer size; by default the created window resolution. */
+    public Resolution framebuffer;
+    /** Pointer listener installed by the application, for injecting pointer input. */
+    public PointerListener pointerListener;
+    public RuntimeException createUiGraphicsFailure;
+    /** Runs at the start of each event-processing iteration, before close handling. */
+    public Runnable onEachFrame = () -> { };
+
     public WindowSettings createdSettings;
     public Resolution createdResolution;
     public int framesRendered;
@@ -50,6 +63,7 @@ public final class FakeWindowSystem implements WindowSystem {
 
     public FakeWindowSystem(List<String> events) {
         this.events = events;
+        this.uiGraphics = new RecordingUiGraphics(events);
     }
 
     public void requestClose() {
@@ -97,13 +111,36 @@ public final class FakeWindowSystem implements WindowSystem {
     }
 
     @Override
-    public void renderBlackFrame() {
+    public void renderFrame(FrameOverlay overlay) {
         framesRendered++;
+        Resolution size = framebufferSize();
+        overlay.draw(size.width(), size.height());
+    }
+
+    @Override
+    public Resolution framebufferSize() {
+        return framebuffer != null ? framebuffer : createdResolution;
+    }
+
+    @Override
+    public UiGraphics createUiGraphics() {
+        events.add("createUiGraphics");
+        if (createUiGraphicsFailure != null) {
+            throw createUiGraphicsFailure;
+        }
+        return uiGraphics;
+    }
+
+    @Override
+    public void setPointerListener(PointerListener listener) {
+        events.add("setPointerListener");
+        pointerListener = listener;
     }
 
     @Override
     public void processEvents() {
         eventIterations++;
+        onEachFrame.run();
         onProcessEvents.run();
         if (eventIterations > iterationsBeforeClose) {
             closeRequested = true;
