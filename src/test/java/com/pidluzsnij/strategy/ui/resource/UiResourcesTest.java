@@ -9,9 +9,12 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.net.URLClassLoader;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -114,13 +117,27 @@ class UiResourcesTest {
     void permissionDeniedOverrideFailsWithoutBundledFallback() throws Exception {
         Path file = UiFixtures.resources().put("b/B.bin", B_OVERRIDE).writeExternal(configBase()).resolve("b/B.bin");
         assumeTrue(file.toFile().setReadable(false, false) && !Files.isReadable(file),
-                "the file system cannot make a file unreadable for this user");
+                "the file system cannot make a file unreadable for this user (Windows uses the locked-file test)");
         try (URLClassLoader loader = bundled()) {
             UiException failure = assertThrows(UiException.class, () -> resources(loader).resolve(UiResourcePath.of("b/B.bin")));
             assertEquals("external b/B.bin", failure.resource());
             assertTrue(failure.reason().contains("could not be read"));
         } finally {
             file.toFile().setReadable(true, false);
+        }
+    }
+
+    @Test
+    void lockedOverrideFailsWithoutBundledFallbackOnWindows() throws Exception {
+        assumeTrue(isWindows(), "only Windows enforces exclusive file locks against readers");
+        Path file = UiFixtures.resources().put("b/B.bin", B_OVERRIDE).writeExternal(configBase()).resolve("b/B.bin");
+        try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ, StandardOpenOption.WRITE);
+             FileLock lock = channel.lock();
+             URLClassLoader loader = bundled()) {
+            assertTrue(lock.isValid());
+            UiException failure = assertThrows(UiException.class, () -> resources(loader).resolve(UiResourcePath.of("b/B.bin")));
+            assertEquals("external b/B.bin", failure.resource());
+            assertTrue(failure.reason().contains("could not be read"), failure.reason());
         }
     }
 
@@ -154,6 +171,30 @@ class UiResourcesTest {
                 assertFalse(failure.getMessage().contains("SENTINEL"));
             }
         }
+    }
+
+    @Test
+    void directoryJunctionsLeavingTheExternalRootAreRejectedOnWindows() throws Exception {
+        assumeTrue(isWindows(), "directory junctions exist only on Windows");
+        Path outside = Files.createDirectories(temp.resolve("outside"));
+        Files.writeString(outside.resolve("sentinel.bin"), "SENTINEL-OUTSIDE-ROOT");
+        Path external = Files.createDirectories(UiFixtures.externalRoot(configBase()));
+        // Unlike symbolic links, junctions need no special privilege.
+        Process mklink = new ProcessBuilder("cmd", "/c", "mklink", "/J", external.resolve("linked").toString(),
+                outside.toString()).redirectErrorStream(true).start();
+        mklink.getInputStream().readAllBytes();
+        assumeTrue(mklink.waitFor() == 0 && Files.exists(external.resolve("linked").resolve("sentinel.bin")),
+                "a directory junction could not be created");
+        try (URLClassLoader loader = bundled()) {
+            UiException failure = assertThrows(UiException.class,
+                    () -> resources(loader).resolve(UiResourcePath.of("linked/sentinel.bin")));
+            assertTrue(failure.reason().contains("outside"), failure.reason());
+            assertFalse(failure.getMessage().contains("SENTINEL"));
+        }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win");
     }
 
     @Test
