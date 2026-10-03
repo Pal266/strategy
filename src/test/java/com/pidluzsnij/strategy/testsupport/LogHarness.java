@@ -94,7 +94,7 @@ public final class LogHarness {
         return new ApplicationLauncher(mode, location, fileOperations, stderr, settingsSchema, configurationLocation,
                 (schema, directory) -> new TomlConfigurationPersistence(schema, directory, configurationStorage),
                 localizationResources, factory, runtime,
-                uiConfiguration != null ? uiConfiguration : UiStartupConfiguration.production(configurationLocation))
+                uiConfiguration != null ? uiConfiguration : com.pidluzsnij.strategy.menu.MainMenu.uiConfiguration(configurationLocation))
                 .launch();
     }
 

@@ -37,8 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The UI foundation within application startup: ordering, fatal failures, cleanup, diagnostics and the
- * unchanged production black screen, with isolated logging, configuration, localization and UI resources.
+ * The UI foundation within application startup: ordering, fatal failures, cleanup and diagnostics, with
+ * isolated logging, configuration, localization and UI resources. The production main menu is covered by
+ * {@link MainMenuStartupTest}.
  */
 class UiStartupTest {
 
@@ -356,41 +357,6 @@ class UiStartupTest {
     }
 
     // --- Production behavior ----------------------------------------------------------------
-
-    @Test
-    void productionConfigurationActivatesNoUiAndSubmitsNothing() throws URISyntaxException {
-        harness = new LogHarness(temp);
-        windowSystem = new FakeWindowSystem(events);
-        windowSystem.iterationsBeforeClose = 50;
-        windowSystem.onEachFrame = () -> windowSystem.pointerListener.primaryButton(true, 5, 5, 1920, 1080);
-
-        assertEquals(0, launch(LoggingMode.DEVELOPMENT), harness.stderr());
-
-        assertTrue(windowSystem.framesRendered > 50);
-        assertEquals(0, windowSystem.uiGraphics.frames, "no UI frame is drawn");
-        assertEquals(List.of(), windowSystem.uiGraphics.draws, "no UI element is submitted");
-        assertTrue(windowSystem.uiGraphics.textures.isEmpty());
-        assertTrue(windowSystem.uiGraphics.faces.isEmpty());
-        assertTrue(harness.log().contains("UI foundation initialized: rendering deferred until a UI definition is "
-                + "loaded, 0 UI definition(s) loaded"));
-        assertFalse(events.contains("ui-initialize"), "no UI shaders or buffers are created, so no OpenGL 2.0 is needed");
-        assertFalse(harness.log().contains("UI resource '"), "no UI resource is resolved");
-        assertFalse(Files.exists(UiResources.externalRoot(harness.configDirectory)), "no external UI directory is created");
-    }
-
-    @Test
-    void normalStartupUsesTheProductionUiConfiguration() throws Exception {
-        UiStartupConfiguration production = ApplicationLauncher.forNormalStartup().uiConfiguration();
-
-        assertEquals(List.of(), production.requiredDefinitions(), "no production UI definition is activated");
-        assertEquals(Set.of(), production.supportedBehaviors(), "no production behavior is defined");
-        assertSame(ApplicationLauncher.class.getClassLoader(), production.bundledResources());
-        assertTrue(production.location() instanceof com.pidluzsnij.strategy.config.persistence.DirectoriesConfigurationLocation);
-
-        Path classes = Path.of(ApplicationLauncher.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-        assertFalse(Files.exists(classes.resolve("ui")), "no production UI resources are bundled");
-        assertNull(ApplicationLauncher.class.getClassLoader().getResource("ui/screens/test.json"));
-    }
 
     @Test
     void windowBehaviorIsUnchangedBySuccessfulUiInitialization() {

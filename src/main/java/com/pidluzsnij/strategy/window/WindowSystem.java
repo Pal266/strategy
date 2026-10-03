@@ -43,6 +43,13 @@ public interface WindowSystem {
 
     boolean isCloseRequested();
 
+    /**
+     * Requests that the window close, exactly as a window close action does: afterwards
+     * {@link #isCloseRequested()} reports {@code true}, so the application leaves its run loop through the
+     * normal shutdown path.
+     */
+    void requestClose();
+
     WindowState windowState();
 
     /** Cleanup: destroys the window and its graphics context if created. */

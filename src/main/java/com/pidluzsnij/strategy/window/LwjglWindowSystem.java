@@ -41,6 +41,7 @@ import static org.lwjgl.glfw.GLFW.glfwSetCursorEnterCallback;
 import static org.lwjgl.glfw.GLFW.glfwSetCursorPosCallback;
 import static org.lwjgl.glfw.GLFW.glfwSetErrorCallback;
 import static org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback;
+import static org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose;
 import static org.lwjgl.glfw.GLFW.glfwSwapBuffers;
 import static org.lwjgl.glfw.GLFW.glfwSwapInterval;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
@@ -245,6 +246,14 @@ public final class LwjglWindowSystem implements WindowSystem {
     @Override
     public boolean isCloseRequested() {
         return glfwWindowShouldClose(window);
+    }
+
+    @Override
+    public void requestClose() {
+        if (window != NULL) {
+            // The same flag a window close action sets, so the run loop ends through its normal path.
+            glfwSetWindowShouldClose(window, true);
+        }
     }
 
     @Override

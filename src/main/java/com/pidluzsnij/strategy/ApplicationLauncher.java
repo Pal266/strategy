@@ -16,6 +16,7 @@ import com.pidluzsnij.strategy.logging.LogLocation;
 import com.pidluzsnij.strategy.logging.LoggingInitializationException;
 import com.pidluzsnij.strategy.logging.LoggingMode;
 import com.pidluzsnij.strategy.logging.LoggingSystem;
+import com.pidluzsnij.strategy.menu.MainMenu;
 import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
 import com.pidluzsnij.strategy.window.Application;
 import com.pidluzsnij.strategy.window.LwjglWindowSystem;
@@ -60,7 +61,7 @@ public final class ApplicationLauncher {
     private final Supplier<RuntimeEnvironment> runtimeFactory;
     private final UiStartupConfiguration uiConfiguration;
 
-    /** A launcher whose UI foundation uses the production UI configuration at {@code configurationLocation}. */
+    /** A launcher whose UI foundation uses the production (main-menu) UI configuration at {@code configurationLocation}. */
     public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,
                                PrintStream stderr, SettingsSchema settingsSchema,
                                ConfigurationLocation configurationLocation,
@@ -70,7 +71,7 @@ public final class ApplicationLauncher {
                                Supplier<RuntimeEnvironment> runtimeFactory) {
         this(mode, logLocation, fileOperations, stderr, settingsSchema, configurationLocation, persistenceFactory,
                 localizationResources, windowSystemFactory, runtimeFactory,
-                UiStartupConfiguration.production(configurationLocation));
+                MainMenu.uiConfiguration(configurationLocation));
     }
 
     public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,

@@ -261,4 +261,31 @@ class UiArchitectureTest {
         assertTrue(pom.contains("<lwjgl.version>3.4.3</lwjgl.version>"));
         assertEquals(2, artifacts.stream().filter("lwjgl-stb"::equals).count(), "API and platform natives");
     }
+
+    // --- SPEC007 main menu ---------------------------------------------------------------------
+
+    @Test
+    void mainMenuBehaviorIsApplicationCodeOutsideTheUiFoundation() {
+        assertTrue(classes.containsKey(BASE + "menu/MainMenu"), classes.keySet().toString());
+        assertEquals(List.of(), violations(UI, BASE + "menu/"), "the UI foundation knows no production screen");
+        assertEquals(List.of(), violations(BASE + "menu/", "org/lwjgl/", BASE + "window/", "java/lang/reflect/",
+                "javax/script/", "forName", "loadClass", "java/lang/Runtime", "java/lang/ProcessBuilder",
+                "java/lang/System.exit", "halt"), "the menu requests shutdown only through the application");
+        assertTrue(classes.get(BASE + "window/Application").contains(BASE + "menu/MainMenu"),
+                "the application shows the main menu after startup");
+    }
+
+    @Test
+    void nothingTerminatesTheProcessAbruptly() {
+        List<String> violations = new ArrayList<>();
+        classes.forEach((name, strings) -> {
+            if (!name.equals(BASE + "Main") && strings.contains("exit") && strings.contains("java/lang/System")) {
+                violations.add(name);
+            }
+            if (strings.contains("halt") && strings.contains("java/lang/Runtime")) {
+                violations.add(name);
+            }
+        });
+        assertEquals(List.of(), violations, "only Main ends the process, with the launcher's exit code");
+    }
 }

@@ -4,6 +4,7 @@ import com.pidluzsnij.strategy.config.ApplicationSettings;
 import com.pidluzsnij.strategy.config.VideoResolution;
 import com.pidluzsnij.strategy.config.VideoSettings;
 import com.pidluzsnij.strategy.localization.Localization;
+import com.pidluzsnij.strategy.menu.MainMenu;
 import com.pidluzsnij.strategy.ui.UiException;
 import com.pidluzsnij.strategy.ui.UiFoundation;
 import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
@@ -13,8 +14,10 @@ import org.slf4j.LoggerFactory;
 import java.util.Objects;
 
 /**
- * Runs the window lifecycle: initialization (GLFW, window, OpenGL, then the UI foundation), black-screen
- * presentation until a close request, and cleanup. Each failure is logged once: window failures here, UI
+ * Runs the window lifecycle: initialization (GLFW, window, OpenGL, then the UI foundation), presentation
+ * until a close request, and cleanup. Frames are cleared to black and the UI foundation draws the screen it
+ * shows over them: the main menu when the UI configuration loaded it. A window close action and the main
+ * menu's Exit both request the same normal shutdown. Each failure is logged once: window failures here, UI
  * foundation initialization failures by the UI foundation.
  */
 public final class Application {
@@ -101,6 +104,7 @@ public final class Application {
             ui = UiFoundation.initialize(uiConfiguration, windowSystem.createUiGraphics(), localization,
                     framebuffer.width(), framebuffer.height());
             windowSystem.setPointerListener(ui.pointerListener());
+            MainMenu.show(ui, windowSystem::requestClose);
         } catch (UiException e) {
             // Already logged by the UI foundation, which also released what it had allocated.
             cleanUp();
