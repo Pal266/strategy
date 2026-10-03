@@ -157,4 +157,59 @@ class UiInteractionTest {
         below.pointerMoved(300, 300, W, H);
         assertEquals(VisualState.HOVERED, below.state("button"));
     }
+
+    // --- SPEC007: disabled components ---------------------------------------------------------
+
+    @Test
+    void disabledComponentStaysDisabledAndNeverActivates() {
+        UiInteraction disabled = new UiInteraction(1000, 500, List.of(
+                new UiInteraction.Target("start", new Bounds(100, 100, 200, 100), "test.start", false)));
+        java.util.function.Consumer<double[]> move = p -> disabled.pointerMoved(p[0], p[1], W, H);
+
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+        move.accept(INSIDE);
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+        assertTrue(disabled.primaryButton(true, INSIDE[0], INSIDE[1], W, H).isEmpty());
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+        move.accept(OUTSIDE);
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+        move.accept(INSIDE);
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+        assertTrue(disabled.primaryButton(false, INSIDE[0], INSIDE[1], W, H).isEmpty(), "no activation");
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+        assertTrue(disabled.primaryButton(true, INSIDE[0], INSIDE[1], W, H).isEmpty());
+        assertTrue(disabled.primaryButton(false, INSIDE[0], INSIDE[1], W, H).isEmpty(), "no activation on a plain click");
+        disabled.pointerLeft();
+        disabled.reset();
+        assertEquals(VisualState.DISABLED, disabled.state("start"));
+    }
+
+    @Test
+    void disabledComponentBlocksInteractiveComponentsBelowIt() {
+        UiInteraction stacked = new UiInteraction(1000, 500, List.of(
+                new UiInteraction.Target("below", new Bounds(100, 100, 200, 100), "test.below"),
+                new UiInteraction.Target("above", new Bounds(100, 100, 200, 100), "test.above", false)));
+
+        stacked.pointerMoved(INSIDE[0], INSIDE[1], W, H);
+        assertEquals(VisualState.NORMAL, stacked.state("below"));
+        stacked.primaryButton(true, INSIDE[0], INSIDE[1], W, H);
+        assertEquals(VisualState.NORMAL, stacked.state("below"));
+        assertTrue(stacked.primaryButton(false, INSIDE[0], INSIDE[1], W, H).isEmpty());
+        assertEquals(VisualState.DISABLED, stacked.state("above"));
+    }
+
+    @Test
+    void enabledTargetsBehaveAsBeforeNextToDisabledOnes() {
+        UiInteraction mixed = new UiInteraction(1000, 500, List.of(
+                new UiInteraction.Target("off", new Bounds(500, 100, 200, 100), "test.off", false),
+                new UiInteraction.Target("start", new Bounds(100, 100, 200, 100), "test.start", true)));
+
+        mixed.pointerMoved(INSIDE[0], INSIDE[1], W, H);
+        assertEquals(VisualState.HOVERED, mixed.state("start"));
+        mixed.primaryButton(true, INSIDE[0], INSIDE[1], W, H);
+        assertEquals(VisualState.PRESSED, mixed.state("start"));
+        assertEquals(Optional.of(new UiActivation("start", "test.start")),
+                mixed.primaryButton(false, INSIDE[0], INSIDE[1], W, H));
+        assertEquals(VisualState.DISABLED, mixed.state("off"));
+    }
 }

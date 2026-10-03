@@ -297,11 +297,22 @@ public final class UiFixtures {
         return "{\"id\": \"" + id + "\", \"type\": \"text\", " + box(x, y, w, h) + ", \"text\": " + style + "}";
     }
 
+    /**
+     * @return an enabled button; its required disabled state reuses the normal image, so enabled fixtures
+     * reference no additional image resource
+     */
     public static String button(String id, int x, int y, int w, int h, String behavior, String normal,
                                 String hovered, String pressed, String label) {
+        return button(id, x, y, w, h, behavior, null, normal, hovered, pressed, normal, label);
+    }
+
+    /** @return a button; {@code enabled} {@code null} omits the optional member */
+    public static String button(String id, int x, int y, int w, int h, String behavior, Boolean enabled,
+                                String normal, String hovered, String pressed, String disabled, String label) {
         return "{\"id\": \"" + id + "\", \"type\": \"button\", " + box(x, y, w, h) + ", \"behavior\": \"" + behavior
-                + "\", \"states\": {\"normal\": \"" + normal + "\", \"hovered\": \"" + hovered + "\", \"pressed\": \""
-                + pressed + "\"}" + (label == null ? "" : ", \"label\": " + label) + "}";
+                + "\"" + (enabled == null ? "" : ", \"enabled\": " + enabled)
+                + ", \"states\": {\"normal\": \"" + normal + "\", \"hovered\": \"" + hovered + "\", \"pressed\": \""
+                + pressed + "\", \"disabled\": \"" + disabled + "\"}" + (label == null ? "" : ", \"label\": " + label) + "}";
     }
 
     public static String style(String key, String font, int size, String color, String align) {
