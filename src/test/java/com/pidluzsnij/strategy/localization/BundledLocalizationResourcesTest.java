@@ -24,7 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** The application's bundled localization resources: initial metadata and the window-title translations. */
+/**
+ * The application's bundled localization resources: initial metadata, the window-title translations and the
+ * SPEC007 main-menu translations.
+ */
 class BundledLocalizationResourcesTest {
 
     private static final List<String> FILES =
@@ -39,6 +42,17 @@ class BundledLocalizationResourcesTest {
         TITLES.put("czech.properties", "Moje strategie");
         TITLES.put("hungarian.properties", "Az én stratégiám");
     }
+
+    /** The specified main-menu translations of each bundled file (SPEC007). */
+    private static final Map<String, Map<String, String>> MENU = Map.of(
+            "english.properties", Map.of("menu.new_game", "New Game", "menu.load_game", "Load Game",
+                    "menu.settings", "Settings", "menu.exit", "Exit"),
+            "ukrainian.properties", Map.of("menu.new_game", "Нова гра", "menu.load_game", "Завантажити гру",
+                    "menu.settings", "Налаштування", "menu.exit", "Вийти"),
+            "czech.properties", Map.of("menu.new_game", "Nová hra", "menu.load_game", "Načíst hru",
+                    "menu.settings", "Nastavení", "menu.exit", "Konec"),
+            "hungarian.properties", Map.of("menu.new_game", "Új játék", "menu.load_game", "Játék betöltése",
+                    "menu.settings", "Beállítások", "menu.exit", "Kilépés"));
 
     @Test
     void initialMetadataListsTheFourLanguagesInOrder() throws Exception {
@@ -58,24 +72,27 @@ class BundledLocalizationResourcesTest {
     }
 
     /**
-     * Each referenced file is a valid UTF-8 localization file whose only production entry is the window
-     * title, occurring exactly once with the specified translation. Before this change the files were
-     * empty, so there are no earlier unrelated entries to preserve.
+     * Each referenced file is a valid UTF-8 localization file whose production entries are exactly the window
+     * title and the four main-menu labels, each occurring once with the specified translation.
      */
     @Test
-    void referencedLocalizationFilesContainOnlyTheWindowTitleTranslation() throws Exception {
+    void referencedLocalizationFilesContainExactlyTheSpecifiedTranslations() throws Exception {
         LocalizationResources bundled = LocalizationResources.bundled();
         for (Map.Entry<String, String> expected : TITLES.entrySet()) {
             String text = Utf8.decode(bundled.read(expected.getKey()));
             TranslationFile file = TranslationFile.parse(text);
 
-            assertEquals(1, file.keyCount(), expected.getKey() + " has no other production key");
-            assertEquals(Map.of(TITLE_KEY, expected.getValue()), file.usableValues(), expected.getKey());
-            long occurrences = Utf8.lines(text).stream()
-                    .filter(line -> line.contains("="))
-                    .filter(line -> UnicodeWhiteSpace.trim(line.substring(0, line.indexOf('='))).equals(TITLE_KEY))
-                    .count();
-            assertEquals(1, occurrences, expected.getKey() + " defines the title key exactly once");
+            Map<String, String> values = new LinkedHashMap<>(MENU.get(expected.getKey()));
+            values.put(TITLE_KEY, expected.getValue());
+            assertEquals(values.size(), file.keyCount(), expected.getKey() + " has no other production key");
+            assertEquals(values, file.usableValues(), expected.getKey());
+            for (String key : values.keySet()) {
+                long occurrences = Utf8.lines(text).stream()
+                        .filter(line -> line.contains("="))
+                        .filter(line -> UnicodeWhiteSpace.trim(line.substring(0, line.indexOf('='))).equals(key))
+                        .count();
+                assertEquals(1, occurrences, expected.getKey() + " defines " + key + " exactly once");
+            }
         }
     }
 
