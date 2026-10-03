@@ -29,6 +29,10 @@ import java.util.regex.Pattern;
  * Image and text components block pointer input to interactive components drawn below them unless they
  * declare {@code "blocking": false}, which marks them as decorations that pointer input passes through.
  * <p>
+ * Buttons require an image for every {@linkplain VisualState visual state}, including {@code disabled}, and
+ * may declare {@code "enabled": false}; they are enabled by default. A disabled button's behavior identifier
+ * must still be supported, but the button can never activate it.
+ * <p>
  * A definition is either completely valid, producing a {@link UiDefinition}, or rejected as a whole.
  *
  * <pre>{@code
@@ -43,8 +47,9 @@ import java.util.regex.Pattern;
  *       "text": { "key": "some.localization.key", "font": "fonts/main.ttf", "size": 64,
  *                 "color": "#FFFFFF", "align": "center" } },
  *     { "id": "start", "type": "button", "x": 760, "y": 500, "width": 400, "height": 100,
- *       "behavior": "some.behavior",
- *       "states": { "normal": "images/n.png", "hovered": "images/h.png", "pressed": "images/p.png" },
+ *       "behavior": "some.behavior", "enabled": true,
+ *       "states": { "normal": "images/n.png", "hovered": "images/h.png", "pressed": "images/p.png",
+ *                   "disabled": "images/d.png" },
  *       "label": { "key": "some.label.key", "font": "fonts/main.ttf", "size": 40, "color": "#202020FF" } }
  *   ]
  * }
@@ -75,7 +80,7 @@ public final class UiDefinitionParser {
     private static final Set<String> LAYOUT = Set.of("width", "height");
     private static final Set<String> COMMON = Set.of("id", "type", "x", "y", "width", "height");
     private static final Set<String> TEXT_STYLE = Set.of("key", "font", "size", "color", "align");
-    private static final Set<String> STATES = Set.of("normal", "hovered", "pressed");
+    private static final Set<String> STATES = Set.of("normal", "hovered", "pressed", "disabled");
 
     private final Set<String> supportedBehaviors;
 
@@ -176,7 +181,7 @@ public final class UiDefinitionParser {
             }
             case "button" -> {
                 Set<String> required = union(COMMON, Set.of("behavior", "states"));
-                members(map, context, union(required, Set.of("label")), required);
+                members(map, context, union(required, Set.of("label", "enabled")), required);
                 bounds = bounds(map, context);
                 String behavior = string(map, "behavior", context);
                 if (!isWellFormedBehavior(behavior)) {
@@ -195,11 +200,22 @@ public final class UiDefinitionParser {
                 Optional<TextStyle> label = map.containsKey("label")
                         ? Optional.of(textStyle(map.get("label"), context + " label"))
                         : Optional.empty();
-                return new UiComponent.Button(id, bounds, behavior, states, label);
+                return new UiComponent.Button(id, bounds, behavior, enabled(map, context), states, label);
             }
             default -> throw new MalformedDefinitionException(context + " has the unsupported type '"
                     + (IDENTIFIER.matcher(type).matches() ? type : "?") + "'");
         }
+    }
+
+    /** @return the optional {@code enabled} member of a button; buttons are enabled by default */
+    private static boolean enabled(Map<String, Object> map, String context) throws MalformedDefinitionException {
+        if (!map.containsKey("enabled")) {
+            return true;
+        }
+        if (!(map.get("enabled") instanceof Boolean value)) {
+            throw new MalformedDefinitionException(context + " member 'enabled' must be true or false");
+        }
+        return value;
     }
 
     /** @return the optional {@code blocking} member; components block pointer input by default */

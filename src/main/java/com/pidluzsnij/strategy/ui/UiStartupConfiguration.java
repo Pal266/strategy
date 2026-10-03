@@ -12,7 +12,7 @@ import java.util.Set;
  * What UI-foundation initialization uses: the class loader holding the bundled {@code ui} resources, the
  * per-user configuration location under whose {@code strategy/ui} directory external overrides live, the UI
  * definitions that must load during startup and the semantic behavior identifiers application code supports.
- * Automated tests supply isolated values.
+ * Application code supplies the production values; automated tests supply isolated values.
  */
 public record UiStartupConfiguration(ClassLoader bundledResources, ConfigurationLocation location,
                                      List<UiResourcePath> requiredDefinitions, Set<String> supportedBehaviors) {
@@ -27,13 +27,5 @@ public record UiStartupConfiguration(ClassLoader bundledResources, Configuration
                 throw new IllegalArgumentException("supported behavior identifiers must be well-formed");
             }
         }
-    }
-
-    /**
-     * Production configuration: the application's own bundled resources and the established per-user
-     * configuration location. No UI definition is activated and no semantic behavior is defined yet.
-     */
-    public static UiStartupConfiguration production(ConfigurationLocation location) {
-        return new UiStartupConfiguration(UiStartupConfiguration.class.getClassLoader(), location, List.of(), Set.of());
     }
 }

@@ -304,7 +304,8 @@ class LoggingSystemTest {
         assertTrue(stderr.contains(harness.logFile().toAbsolutePath().toString()), stderr);
         assertEquals(List.of("initialize", "startingMonitor", "createWindow", "initializeGraphics",
                 "createUiGraphics", "setPointerListener", "ui-close", "destroyWindow", "terminate"),
-                windowSystem.events, "cleanup must run to completion");
+                windowSystem.events.stream().filter(e -> !e.startsWith("ui-") || e.equals("ui-close")).toList(),
+                "cleanup must run to completion");
         assertEquals(0, exit);
 
         String log = harness.log();

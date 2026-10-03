@@ -7,6 +7,8 @@ import com.pidluzsnij.strategy.ui.layout.LayoutTransform;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Pointer interaction state of the interactive components of one UI.
@@ -17,6 +19,8 @@ import java.util.Optional;
  *     inside it and normal while outside; releasing inside it produces one activation.</li>
  *     <li>A press that begins on no component captures nothing: no component is hovered or pressed until
  *     the button is released, and the release activates nothing.</li>
+ *     <li>A disabled interactive component is always in its disabled state: it is never hovered, pressed or
+ *     activated, and it blocks pointer input to components below it.</li>
  *     <li>Points outside the logical UI area never hit a component.</li>
  * </ul>
  * Hit testing uses {@link LayoutTransform#hits}, the transform also used for rendering.
@@ -24,23 +28,34 @@ import java.util.Optional;
 public final class UiInteraction {
 
     /**
-     * A component taking part in hit testing: an interactive component with its semantic behavior identifier,
-     * or a blocking component ({@code behavior} {@code null}) that stops pointer input from reaching
-     * interactive components below it.
+     * A component taking part in hit testing: an interactive component with its semantic behavior identifier
+     * and whether it is enabled, or a blocking component ({@code behavior} {@code null}) that stops pointer
+     * input from reaching interactive components below it.
      */
-    public record Target(String id, Bounds bounds, String behavior) {
+    public record Target(String id, Bounds bounds, String behavior, boolean enabled) {
         public Target {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(bounds, "bounds");
         }
 
-        /** @return a target that blocks pointer input without being interactive */
-        public static Target blocker(String id, Bounds bounds) {
-            return new Target(id, bounds, null);
+        /** An enabled interactive target. */
+        public Target(String id, Bounds bounds, String behavior) {
+            this(id, bounds, behavior, true);
         }
 
+        /** @return a target that blocks pointer input without being interactive */
+        public static Target blocker(String id, Bounds bounds) {
+            return new Target(id, bounds, null, false);
+        }
+
+        /** @return whether the target can be hovered, pressed and activated */
         public boolean interactive() {
-            return behavior != null;
+            return behavior != null && enabled;
+        }
+
+        /** @return whether the target is an interactive component that is disabled */
+        public boolean disabled() {
+            return behavior != null && !enabled;
         }
     }
 
@@ -48,6 +63,7 @@ public final class UiInteraction {
     private final int logicalHeight;
     /** Interactive and blocking components in rendering order; later targets are on top. */
     private final List<Target> targets;
+    private final Set<String> disabled;
 
     private Target hovered;
     private boolean held;
@@ -57,6 +73,7 @@ public final class UiInteraction {
         this.logicalWidth = logicalWidth;
         this.logicalHeight = logicalHeight;
         this.targets = List.copyOf(targets);
+        this.disabled = this.targets.stream().filter(Target::disabled).map(Target::id).collect(Collectors.toUnmodifiableSet());
     }
 
     public void pointerMoved(double x, double y, int framebufferWidth, int framebufferHeight) {
@@ -98,6 +115,9 @@ public final class UiInteraction {
 
     /** @return the current visual state of the component {@code id} */
     public VisualState state(String id) {
+        if (disabled.contains(id)) {
+            return VisualState.DISABLED;
+        }
         if (held) {
             return captured != null && captured.id().equals(id) && captured == hovered
                     ? VisualState.PRESSED
@@ -111,7 +131,8 @@ public final class UiInteraction {
         for (int i = targets.size() - 1; i >= 0; i--) {
             Target target = targets.get(i);
             if (transform.hits(target.bounds(), x, y)) {
-                // The topmost hit decides: an interactive component, or a blocker hiding what lies below.
+                // The topmost hit decides: an enabled interactive component, or a blocker or disabled
+                // component hiding what lies below.
                 return target.interactive() ? target : null;
             }
         }

@@ -261,4 +261,21 @@ class UiArchitectureTest {
         assertTrue(pom.contains("<lwjgl.version>3.4.3</lwjgl.version>"));
         assertEquals(2, artifacts.stream().filter("lwjgl-stb"::equals).count(), "API and platform natives");
     }
+
+    // --- SPEC007 main menu ---------------------------------------------------------------------
+
+    @Test
+    void mainMenuBehaviorIsApplicationCodeOutsideTheUiFoundation() {
+        assertTrue(classes.containsKey(BASE + "menu/MainMenu"), classes.keySet().toString());
+        assertEquals(List.of(), violations(UI, BASE + "menu/"), "the UI foundation knows no production screen");
+        assertEquals(List.of(), violations(BASE + "menu/", "org/lwjgl/", BASE + "window/", "java/lang/reflect/",
+                "javax/script/", "forName", "loadClass", "java/lang/Runtime", "java/lang/ProcessBuilder",
+                "java/lang/System.exit", "halt"), "the menu requests shutdown only through the application");
+        assertEquals(List.of(), violations(BASE + "window/", BASE + "menu/"),
+                "the window lifecycle shows whatever first screen it is given; it knows no product screen");
+        assertTrue(classes.get(BASE + "window/Application").contains(UI + "UiStartup$FirstScreen"),
+                "the application shows the first screen of the supplied UI startup");
+        assertTrue(classes.get(BASE + "ApplicationLauncher").contains(BASE + "menu/MainMenu"),
+                "startup wiring chooses the main menu as the production first screen");
+    }
 }

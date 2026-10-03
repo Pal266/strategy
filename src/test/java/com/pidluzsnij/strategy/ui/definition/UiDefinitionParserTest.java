@@ -96,7 +96,8 @@ class UiDefinitionParserTest {
         assertEquals(new Bounds(20, 20, 300, 60), startB.bounds());
         assertEquals(Map.of(VisualState.NORMAL, UiResourcePath.of("images/n-a.png"),
                 VisualState.HOVERED, UiResourcePath.of("images/h-a.png"),
-                VisualState.PRESSED, UiResourcePath.of("images/p-a.png")), startA.states());
+                VisualState.PRESSED, UiResourcePath.of("images/p-a.png"),
+                VisualState.DISABLED, UiResourcePath.of("images/n-a.png")), startA.states());
         assertEquals(UiResourcePath.of("images/p-b.png"), startB.image(VisualState.PRESSED));
         assertEquals(TextAlign.LEFT, startB.label().orElseThrow().align(), "alignment defaults to left");
         assertEquals(20, startB.label().orElseThrow().size());
@@ -309,7 +310,7 @@ class UiDefinitionParserTest {
                     + "\"behavior\": \"test.start\", \"states\": {\"normal\": \"a.png\", \"hovered\": \"b.png\"}}",
             "{\"id\": \"a\", \"type\": \"button\", \"x\": 0, \"y\": 0, \"width\": 10, \"height\": 10, "
                     + "\"behavior\": \"test.start\", \"states\": {\"normal\": \"a.png\", \"hovered\": \"b.png\", "
-                    + "\"pressed\": \"c.png\", \"disabled\": \"d.png\"}}",
+                    + "\"pressed\": \"c.png\", \"disabled\": \"d.png\", \"focused\": \"e.png\"}}",
     })
     void invalidComponentsAreRejected(String component) {
         rejected(definition(100, 100, component));
@@ -333,5 +334,72 @@ class UiDefinitionParserTest {
         UiDefinition parsed = parse(definition(100, 100,
                 text("t", 0, 0, 10, 10, style("test.\\u0457\\u0436\\u0430\\u043a", "fonts/a.ttf", 12, "#FFFFFF", null))));
         assertEquals("test.їжак", parsed.textStyles().get(0).localizationKey());
+    }
+
+    // --- SPEC007: enabled/disabled buttons ----------------------------------------------------
+
+    private static String fourStates(String enabledMember, String states) {
+        return "{\"id\": \"b\", \"type\": \"button\", \"x\": 0, \"y\": 0, \"width\": 10, \"height\": 10, "
+                + "\"behavior\": \"test.start\"" + enabledMember + ", \"states\": " + states + "}";
+    }
+
+    private static final String ALL_STATES = "{\"normal\": \"images/n.png\", \"hovered\": \"images/h.png\", "
+            + "\"pressed\": \"images/p.png\", \"disabled\": \"images/d.png\"}";
+
+    @Test
+    void disabledButtonWithAllFourStatesIsAccepted() throws Exception {
+        UiDefinition parsed = parse(definition(100, 100, fourStates(", \"enabled\": false", ALL_STATES)));
+
+        UiComponent.Button button = (UiComponent.Button) parsed.component("b");
+        assertFalse(button.enabled());
+        assertEquals("test.start", button.behavior(), "the behavior stays declared data");
+        assertEquals(UiResourcePath.of("images/d.png"), button.image(VisualState.DISABLED));
+        assertTrue(parsed.imageResources().contains(UiResourcePath.of("images/d.png")),
+                "the disabled image is loaded for rendering");
+        assertTrue(button.blocking());
+    }
+
+    @Test
+    void buttonsAreEnabledExplicitlyOrByDefault() throws Exception {
+        assertTrue(((UiComponent.Button) parse(definition(100, 100, fourStates(", \"enabled\": true", ALL_STATES)))
+                .component("b")).enabled());
+        assertTrue(((UiComponent.Button) parse(definition(100, 100, fourStates("", ALL_STATES)))
+                .component("b")).enabled());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"normal\": \"images/n.png\", \"hovered\": \"images/h.png\", \"pressed\": \"images/p.png\"}",
+            "{\"normal\": \"images/n.png\", \"hovered\": \"images/h.png\", \"pressed\": \"images/p.png\", "
+                    + "\"disabled\": \"images/d.jpg\"}",
+            "{\"normal\": \"images/n.png\", \"hovered\": \"images/h.png\", \"pressed\": \"images/p.png\", "
+                    + "\"disabled\": \"../d.png\"}",
+            "{\"normal\": \"images/n.png\", \"hovered\": \"images/h.png\", \"pressed\": \"images/p.png\", "
+                    + "\"disabled\": 1}",
+    })
+    void buttonWithoutAUsableDisabledStateIsRejectedAsAWhole(String states) {
+        for (String enabled : List.of("", ", \"enabled\": true", ", \"enabled\": false")) {
+            UiException failure = rejected(definition(100, 100,
+                    image("valid", 0, 0, 10, 10, "images/bg.png"), fourStates(enabled, states)));
+            assertTrue(failure.reason().contains("disabled"), failure.reason());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"\"false\"", "0", "null", "{}"})
+    void malformedEnabledValuesAreRejected(String value) {
+        UiException failure = rejected(definition(100, 100, fourStates(", \"enabled\": " + value, ALL_STATES)));
+        assertTrue(failure.reason().contains("enabled"), failure.reason());
+    }
+
+    @Test
+    void disabledButtonsMustStillReferenceASupportedBehavior() {
+        rejected(definition(100, 100, fourStates(", \"enabled\": false", ALL_STATES).replace("test.start", "test.unknown")));
+        rejected(definition(100, 100, fourStates(", \"enabled\": false", ALL_STATES).replace("test.start", "Bad Id")));
+    }
+
+    @Test
+    void enabledIsNotAcceptedOnNonInteractiveComponents() {
+        rejected(definition(100, 100, image("i", 0, 0, 10, 10, "images/bg.png").replace("}", ", \"enabled\": false}")));
     }
 }

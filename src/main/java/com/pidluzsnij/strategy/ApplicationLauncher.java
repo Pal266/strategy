@@ -16,6 +16,8 @@ import com.pidluzsnij.strategy.logging.LogLocation;
 import com.pidluzsnij.strategy.logging.LoggingInitializationException;
 import com.pidluzsnij.strategy.logging.LoggingMode;
 import com.pidluzsnij.strategy.logging.LoggingSystem;
+import com.pidluzsnij.strategy.menu.MainMenu;
+import com.pidluzsnij.strategy.ui.UiStartup;
 import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
 import com.pidluzsnij.strategy.window.Application;
 import com.pidluzsnij.strategy.window.LwjglWindowSystem;
@@ -58,9 +60,9 @@ public final class ApplicationLauncher {
     private final LocalizationResources localizationResources;
     private final Supplier<WindowSystem> windowSystemFactory;
     private final Supplier<RuntimeEnvironment> runtimeFactory;
-    private final UiStartupConfiguration uiConfiguration;
+    private final UiStartup uiStartup;
 
-    /** A launcher whose UI foundation uses the production UI configuration at {@code configurationLocation}. */
+    /** A launcher whose UI starts with the production main menu, configured at {@code configurationLocation}. */
     public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,
                                PrintStream stderr, SettingsSchema settingsSchema,
                                ConfigurationLocation configurationLocation,
@@ -70,7 +72,7 @@ public final class ApplicationLauncher {
                                Supplier<RuntimeEnvironment> runtimeFactory) {
         this(mode, logLocation, fileOperations, stderr, settingsSchema, configurationLocation, persistenceFactory,
                 localizationResources, windowSystemFactory, runtimeFactory,
-                UiStartupConfiguration.production(configurationLocation));
+                MainMenu.uiStartup(configurationLocation));
     }
 
     public ApplicationLauncher(LoggingMode mode, LogLocation logLocation, FileOperations fileOperations,
@@ -80,7 +82,7 @@ public final class ApplicationLauncher {
                                LocalizationResources localizationResources,
                                Supplier<WindowSystem> windowSystemFactory,
                                Supplier<RuntimeEnvironment> runtimeFactory,
-                               UiStartupConfiguration uiConfiguration) {
+                               UiStartup uiStartup) {
         if (!settingsSchema.contains(LocalizationSettings.LANGUAGE)) {
             throw new IllegalArgumentException("the settings schema must contain the localization language setting");
         }
@@ -94,7 +96,7 @@ public final class ApplicationLauncher {
         this.localizationResources = localizationResources;
         this.windowSystemFactory = windowSystemFactory;
         this.runtimeFactory = runtimeFactory;
-        this.uiConfiguration = Objects.requireNonNull(uiConfiguration, "uiConfiguration");
+        this.uiStartup = Objects.requireNonNull(uiStartup, "uiStartup");
     }
 
     /** The launcher used by normal application startup. */
@@ -112,7 +114,12 @@ public final class ApplicationLauncher {
 
     /** @return the UI-foundation configuration this launcher uses */
     public UiStartupConfiguration uiConfiguration() {
-        return uiConfiguration;
+        return uiStartup.configuration();
+    }
+
+    /** @return how this launcher's UI starts: its configuration and first screen */
+    public UiStartup uiStartup() {
+        return uiStartup;
     }
 
     /** @return the logging mode this launcher initializes */
@@ -146,7 +153,7 @@ public final class ApplicationLauncher {
             Application application;
             try {
                 application = new Application(windowSystemFactory.get(), runtimeFactory.get(), settings.get(),
-                        localization.get(), uiConfiguration);
+                        localization.get(), uiStartup);
             } catch (RuntimeException | LinkageError e) {
                 log.error("Application infrastructure could not be created", e);
                 return Application.EXIT_FAILURE;

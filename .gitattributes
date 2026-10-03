@@ -1,0 +1,2 @@
+# SPEC007: supplied UI resources are normative and must stay byte-identical on every checkout.
+src/main/resources/ui/** -text

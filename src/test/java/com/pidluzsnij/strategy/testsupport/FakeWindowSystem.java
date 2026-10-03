@@ -66,6 +66,7 @@ public final class FakeWindowSystem implements WindowSystem {
         this.uiGraphics = new RecordingUiGraphics(events);
     }
 
+    @Override
     public void requestClose() {
         closeRequested = true;
     }

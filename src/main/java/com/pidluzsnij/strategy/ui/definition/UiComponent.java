@@ -46,8 +46,10 @@ public sealed interface UiComponent {
     /**
      * An interactive component: one image per visual state, an optional label, and the identifier of the
      * application-defined semantic behavior that application code performs when the component is activated.
+     * A disabled button is always drawn in its {@linkplain VisualState#DISABLED disabled} state, is never
+     * hovered or pressed and never produces an activation; it still blocks pointer input below it.
      */
-    record Button(String id, Bounds bounds, String behavior, Map<VisualState, UiResourcePath> states,
+    record Button(String id, Bounds bounds, String behavior, boolean enabled, Map<VisualState, UiResourcePath> states,
                   Optional<TextStyle> label) implements UiComponent {
         public Button {
             Objects.requireNonNull(id, "id");

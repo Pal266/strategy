@@ -108,7 +108,7 @@ public final class ProbeMain {
         try (URLClassLoader loader = new URLClassLoader(new URL[] {bundledRoot.toUri().toURL()},
                 ClassLoader.getPlatformClassLoader())) {
             com.pidluzsnij.strategy.ui.UiStartupConfiguration configuration =
-                    com.pidluzsnij.strategy.ui.UiStartupConfiguration.production(() -> configDirectory);
+                    com.pidluzsnij.strategy.menu.MainMenu.uiConfiguration(() -> configDirectory);
             com.pidluzsnij.strategy.ui.resource.UiResources resources =
                     new com.pidluzsnij.strategy.ui.resource.UiResources(loader,
                             com.pidluzsnij.strategy.ui.resource.UiResources.externalRoot(
