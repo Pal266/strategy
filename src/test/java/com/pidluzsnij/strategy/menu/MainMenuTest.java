@@ -195,7 +195,6 @@ class MainMenuTest {
 
     @Test
     void definitionIsDeclarativeDataWithApplicationOwnedBehavior() throws Exception {
-        String json = new String(bundled(MainMenu.DEFINITION.value()).bytes(), StandardCharsets.UTF_8);
         UiDefinition definition = suppliedDefinition();
 
         // The closed schema accepted every member, so the definition holds only supported presentation data.
@@ -210,10 +209,17 @@ class MainMenuTest {
                 () -> new UiDefinitionParser(Set.of()).parse(bundled(MainMenu.DEFINITION.value())),
                 "identifiers are meaningful only when application code declares them");
         assertTrue(unsupported.reason().contains("unsupported behavior"), unsupported.reason());
-        for (String executable : List.of("class", "method", "script", "eval", "function", "native", "exec", "java")) {
-            assertFalse(json.toLowerCase(java.util.Locale.ROOT).contains("\"" + executable),
-                    "no executable member: " + executable);
-        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"script", "class", "method", "expression", "onClick", "nativeLibrary"})
+    void suppliedDefinitionWithAnUnknownMemberIsRejected(String member) throws Exception {
+        // The closed schema, not a keyword search, keeps executable constructs out of UI resources.
+        String json = new String(bundled(MainMenu.DEFINITION.value()).bytes(), StandardCharsets.UTF_8)
+                .replace("\"behavior\": \"menu.exit\",", "\"behavior\": \"menu.exit\", \"" + member + "\": \"x\",");
+        UiException failure = assertThrows(UiException.class, () -> new UiDefinitionParser(MainMenu.BEHAVIORS).parse(
+                new ResolvedUiResource(MainMenu.DEFINITION, UiResourceOrigin.BUNDLED, json.getBytes(StandardCharsets.UTF_8))));
+        assertTrue(failure.reason().contains("unsupported member '" + member + "'"), failure.reason());
     }
 
     // --- Font and localization -------------------------------------------------------------
@@ -344,7 +350,7 @@ class MainMenuTest {
         ui = UiFoundation.initialize(MainMenu.uiConfiguration(this::configBase), graphics, localization("en"), W, H);
         AtomicInteger exits = new AtomicInteger();
 
-        UiScreen screen = MainMenu.show(ui, exits::incrementAndGet).orElseThrow();
+        UiScreen screen = MainMenu.show(ui, exits::incrementAndGet);
 
         assertEquals(screen, ui.activeScreen().orElseThrow(), "the main menu is the active screen");
         PointerListener pointer = ui.pointerListener();
@@ -358,13 +364,26 @@ class MainMenuTest {
     }
 
     @Test
-    void mainMenuIsNotShownWhenTheUiDidNotLoadIt() throws Exception {
+    void showingTheMainMenuFailsWhenTheUiDidNotLoadIt() throws Exception {
         UiStartupConfiguration none = new UiStartupConfiguration(MainMenu.class.getClassLoader(), this::configBase,
                 List.of(), MainMenu.BEHAVIORS);
         ui = UiFoundation.initialize(none, graphics, localization("en"), W, H);
 
-        assertTrue(MainMenu.show(ui, () -> { }).isEmpty());
+        IllegalStateException failure = assertThrows(IllegalStateException.class, () -> MainMenu.show(ui, () -> { }));
+        assertTrue(failure.getMessage().contains("definitions/main-menu.json"), failure.getMessage());
         assertTrue(ui.activeScreen().isEmpty());
+    }
+
+    @Test
+    void productionStartupPairsTheMainMenuConfigurationWithTheMainMenu() throws Exception {
+        com.pidluzsnij.strategy.ui.UiStartup startup = MainMenu.uiStartup(this::configBase);
+        assertEquals(List.of(MainMenu.DEFINITION), startup.configuration().requiredDefinitions());
+
+        ui = UiFoundation.initialize(startup.configuration(), graphics, localization("en"), W, H);
+        AtomicInteger exits = new AtomicInteger();
+        startup.firstScreen().show(ui, exits::incrementAndGet);
+
+        assertEquals(ui.requiredScreen(MainMenu.DEFINITION), ui.activeScreen());
     }
 
     // --- External overrides --------------------------------------------------------------------

@@ -4,10 +4,9 @@ import com.pidluzsnij.strategy.config.ApplicationSettings;
 import com.pidluzsnij.strategy.config.VideoResolution;
 import com.pidluzsnij.strategy.config.VideoSettings;
 import com.pidluzsnij.strategy.localization.Localization;
-import com.pidluzsnij.strategy.menu.MainMenu;
 import com.pidluzsnij.strategy.ui.UiException;
 import com.pidluzsnij.strategy.ui.UiFoundation;
-import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
+import com.pidluzsnij.strategy.ui.UiStartup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,8 +15,8 @@ import java.util.Objects;
 /**
  * Runs the window lifecycle: initialization (GLFW, window, OpenGL, then the UI foundation), presentation
  * until a close request, and cleanup. Frames are cleared to black and the UI foundation draws the screen it
- * shows over them: the main menu when the UI configuration loaded it. A window close action and the main
- * menu's Exit both request the same normal shutdown. Each failure is logged once: window failures here, UI
+ * shows over them: the {@linkplain UiStartup#firstScreen() first screen} of the supplied UI startup, which may
+ * request the same normal shutdown as a window close action. Each failure is logged once: window failures here, UI
  * foundation initialization failures by the UI foundation.
  */
 public final class Application {
@@ -36,14 +35,14 @@ public final class Application {
     private final VideoResolution configuredResolution;
     private final ApplicationSettings applicationSettings;
     private final Localization localization;
-    private final UiStartupConfiguration uiConfiguration;
+    private final UiStartup uiStartup;
     private UiFoundation ui;
 
     public Application(WindowSystem windowSystem, RuntimeEnvironment runtime,
                        ApplicationSettings applicationSettings, Localization localization,
-                       UiStartupConfiguration uiConfiguration) {
+                       UiStartup uiStartup) {
         this.windowSystem = windowSystem;
-        this.uiConfiguration = Objects.requireNonNull(uiConfiguration, "uiConfiguration");
+        this.uiStartup = Objects.requireNonNull(uiStartup, "uiStartup");
         this.runtime = runtime;
         this.localization = Objects.requireNonNull(localization, "localization");
         // The title is resolved once, after localization succeeded and before the window is created.
@@ -101,10 +100,10 @@ public final class Application {
 
         try {
             Resolution framebuffer = windowSystem.framebufferSize();
-            ui = UiFoundation.initialize(uiConfiguration, windowSystem.createUiGraphics(), localization,
+            ui = UiFoundation.initialize(uiStartup.configuration(), windowSystem.createUiGraphics(), localization,
                     framebuffer.width(), framebuffer.height());
             windowSystem.setPointerListener(ui.pointerListener());
-            MainMenu.show(ui, windowSystem::requestClose);
+            uiStartup.firstScreen().show(ui, windowSystem::requestClose);
         } catch (UiException e) {
             // Already logged by the UI foundation, which also released what it had allocated.
             cleanUp();

@@ -56,8 +56,13 @@ public final class LogHarness {
     public ConfigurationLocation configurationLocation;
     /** Localization resources; by default the application's bundled, read-only resources. */
     public LocalizationResources localizationResources = LocalizationResources.bundled();
-    /** UI-foundation configuration; by default the production configuration at {@link #configurationLocation}. */
+    /**
+     * UI-foundation configuration loaded without showing a first screen; when neither this nor
+     * {@link #uiStartup} is set, the production main-menu startup at {@link #configurationLocation} is used.
+     */
     public UiStartupConfiguration uiConfiguration;
+    /** Complete UI startup (configuration and first screen); takes precedence over {@link #uiConfiguration}. */
+    public com.pidluzsnij.strategy.ui.UiStartup uiStartup;
 
     public LogHarness(Path tempDirectory) {
         this.configDirectory = tempDirectory.resolve("config");
@@ -94,7 +99,9 @@ public final class LogHarness {
         return new ApplicationLauncher(mode, location, fileOperations, stderr, settingsSchema, configurationLocation,
                 (schema, directory) -> new TomlConfigurationPersistence(schema, directory, configurationStorage),
                 localizationResources, factory, runtime,
-                uiConfiguration != null ? uiConfiguration : com.pidluzsnij.strategy.menu.MainMenu.uiConfiguration(configurationLocation))
+                uiStartup != null ? uiStartup
+                        : uiConfiguration != null ? com.pidluzsnij.strategy.ui.UiStartup.withoutFirstScreen(uiConfiguration)
+                        : com.pidluzsnij.strategy.menu.MainMenu.uiStartup(configurationLocation))
                 .launch();
     }
 

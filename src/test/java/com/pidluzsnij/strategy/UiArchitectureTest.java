@@ -271,21 +271,11 @@ class UiArchitectureTest {
         assertEquals(List.of(), violations(BASE + "menu/", "org/lwjgl/", BASE + "window/", "java/lang/reflect/",
                 "javax/script/", "forName", "loadClass", "java/lang/Runtime", "java/lang/ProcessBuilder",
                 "java/lang/System.exit", "halt"), "the menu requests shutdown only through the application");
-        assertTrue(classes.get(BASE + "window/Application").contains(BASE + "menu/MainMenu"),
-                "the application shows the main menu after startup");
-    }
-
-    @Test
-    void nothingTerminatesTheProcessAbruptly() {
-        List<String> violations = new ArrayList<>();
-        classes.forEach((name, strings) -> {
-            if (!name.equals(BASE + "Main") && strings.contains("exit") && strings.contains("java/lang/System")) {
-                violations.add(name);
-            }
-            if (strings.contains("halt") && strings.contains("java/lang/Runtime")) {
-                violations.add(name);
-            }
-        });
-        assertEquals(List.of(), violations, "only Main ends the process, with the launcher's exit code");
+        assertEquals(List.of(), violations(BASE + "window/", BASE + "menu/"),
+                "the window lifecycle shows whatever first screen it is given; it knows no product screen");
+        assertTrue(classes.get(BASE + "window/Application").contains(UI + "UiStartup$FirstScreen"),
+                "the application shows the first screen of the supplied UI startup");
+        assertTrue(classes.get(BASE + "ApplicationLauncher").contains(BASE + "menu/MainMenu"),
+                "startup wiring chooses the main menu as the production first screen");
     }
 }

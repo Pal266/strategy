@@ -3,6 +3,7 @@ package com.pidluzsnij.strategy.menu;
 import com.pidluzsnij.strategy.config.persistence.ConfigurationLocation;
 import com.pidluzsnij.strategy.ui.UiFoundation;
 import com.pidluzsnij.strategy.ui.UiScreen;
+import com.pidluzsnij.strategy.ui.UiStartup;
 import com.pidluzsnij.strategy.ui.UiStartupConfiguration;
 import com.pidluzsnij.strategy.ui.input.UiActivation;
 import com.pidluzsnij.strategy.ui.resource.UiResourcePath;
@@ -11,7 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -49,16 +49,24 @@ public final class MainMenu {
         return new UiStartupConfiguration(MainMenu.class.getClassLoader(), location, List.of(DEFINITION), BEHAVIORS);
     }
 
+    /** Production UI startup: the {@linkplain #uiConfiguration main-menu configuration} showing the main menu. */
+    public static UiStartup uiStartup(ConfigurationLocation location) {
+        return new UiStartup(uiConfiguration(location), MainMenu::show);
+    }
+
     /**
-     * Shows the main menu when {@code ui} loaded it during initialization.
+     * Shows the main menu, which {@code ui} must have loaded as a required definition during initialization.
      *
      * @param exit performed when the Exit behavior is activated; requests normal application shutdown
-     * @return the main-menu screen now shown, or empty when {@code ui} did not load the main menu
+     * @return the main-menu screen now shown
+     * @throws IllegalStateException when {@code ui} did not load the main menu: the UI startup is misconfigured
      */
-    public static Optional<UiScreen> show(UiFoundation ui, Runnable exit) {
+    public static UiScreen show(UiFoundation ui, Runnable exit) {
         Objects.requireNonNull(exit, "exit");
-        Optional<UiScreen> screen = ui.requiredScreen(DEFINITION);
-        screen.ifPresent(menu -> ui.show(menu, activation -> perform(activation, exit)));
+        UiScreen screen = ui.requiredScreen(DEFINITION).orElseThrow(() -> new IllegalStateException(
+                "the main menu cannot be shown: UI definition '" + DEFINITION.value()
+                        + "' was not loaded during UI initialization"));
+        ui.show(screen, activation -> perform(activation, exit));
         return screen;
     }
 

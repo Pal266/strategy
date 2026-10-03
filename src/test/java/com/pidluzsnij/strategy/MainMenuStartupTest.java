@@ -62,12 +62,37 @@ class MainMenuStartupTest {
 
     @Test
     void normalStartupUsesTheMainMenuUiConfiguration() {
-        UiStartupConfiguration production = ApplicationLauncher.forNormalStartup().uiConfiguration();
+        ApplicationLauncher launcher = ApplicationLauncher.forNormalStartup();
+        UiStartupConfiguration production = launcher.uiConfiguration();
 
         assertEquals(List.of(MainMenu.DEFINITION), production.requiredDefinitions());
         assertEquals(MainMenu.BEHAVIORS, production.supportedBehaviors());
         assertSame(ApplicationLauncher.class.getClassLoader(), production.bundledResources());
         assertTrue(production.location() instanceof com.pidluzsnij.strategy.config.persistence.DirectoriesConfigurationLocation);
+        assertSame(production, launcher.uiStartup().configuration(), "one configuration, paired with its first screen");
+        assertTrue(launcher.uiStartup().firstScreen() != com.pidluzsnij.strategy.ui.UiStartup.FirstScreen.NONE,
+                "production shows a first screen");
+    }
+
+    @Test
+    void misconfiguredStartupThatCannotShowTheMainMenuFailsStartup() {
+        prepare();
+        windowSystem.iterationsBeforeClose = 100;
+        // The main menu is the first screen, but the configuration does not load its definition.
+        harness.uiStartup = new com.pidluzsnij.strategy.ui.UiStartup(new UiStartupConfiguration(
+                MainMenu.class.getClassLoader(), () -> harness.configDirectory, List.of(), MainMenu.BEHAVIORS),
+                MainMenu::show);
+
+        assertEquals(1, launch(LoggingMode.DEFAULT));
+
+        assertEquals(0, windowSystem.eventIterations, "the event loop is never entered");
+        List<String> errors = harness.records().stream().filter(r -> r.contains(" ERROR [")).toList();
+        assertEquals(1, errors.size(), harness.log());
+        assertTrue(errors.get(0).contains("UI initialization failed"), errors.get(0));
+        assertTrue(harness.log().contains("definitions/main-menu.json' was not loaded"), harness.log());
+        List<String> tail = events.subList(events.size() - 3, events.size());
+        assertEquals(List.of("ui-close", "destroyWindow", "terminate"), tail, "existing failed-startup cleanup");
+        assertFalse(harness.log().contains(NORMAL_SHUTDOWN));
     }
 
     @Test
@@ -95,8 +120,8 @@ class MainMenuStartupTest {
     void exitActivationPerformsTheNormalShutdown() {
         prepare();
         windowSystem.iterationsBeforeClose = 1_000;
-        windowSystem.onEachFrame = () -> {
-            events.add("frame");
+        // Pointer input arrives during event processing, as GLFW delivers it from glfwPollEvents.
+        windowSystem.onProcessEvents = () -> {
             if (windowSystem.eventIterations == 3) {
                 windowSystem.pointerListener.pointerMoved(EXIT[0], EXIT[1], 1920, 1080);
                 windowSystem.pointerListener.primaryButton(true, EXIT[0], EXIT[1], 1920, 1080);
@@ -129,8 +154,7 @@ class MainMenuStartupTest {
         prepare();
         windowSystem.iterationsBeforeClose = 5;
         // Clicking a disabled button does not end the application.
-        windowSystem.onEachFrame = () -> {
-            events.add("frame");
+        windowSystem.onProcessEvents = () -> {
             windowSystem.pointerListener.primaryButton(true, NEW_GAME[0], NEW_GAME[1], 1920, 1080);
             windowSystem.pointerListener.primaryButton(false, NEW_GAME[0], NEW_GAME[1], 1920, 1080);
         };
